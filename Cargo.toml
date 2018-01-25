@@ -1,0 +1,7 @@
+[package]
+name = "optirust"
+version = "0.1.0"
+authors = ["Laurent Charignon <l.charignon@gmail.com>"]
+
+[dependencies]
+bio = "*"
