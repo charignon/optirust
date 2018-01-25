@@ -18,34 +18,88 @@ Constraint: Timezone aware
 Constraint: as much FP as possible, pluggable I/O and dependency, the middle should be
 as isolated from the rest as possible
 
-extern crate bio;
-use bio::data_structures::interval_tree::{IntervalTree};
-use bio::utils::Interval;
-fn main() {
-let mut tree = IntervalTree::new();
-tree.insert(11..20, "Range_1");
-tree.insert(25..30, "Range_2");
-for r in tree.find(15..25) {
-assert_eq!(r.interval().start, 11);
-assert_eq!(r.interval().end, 20);
-assert_eq!(r.interval(), &(Interval::from(11..20)));
-assert_eq!(r.data(), &"Range_1");
-    }
-}
-
 1. we can parse the input file and map to a struct
 ==================================================
 What is the input?
 We need two files, a config file with the paramater and an input file with the
 requested meeting.
+Let's define a struct for the options and another one for the input.
+
+1.a The config file
+===================
+- DONE What is it like?
+- DONE Can we parse it?
+
+1.b The input file
+==================
+- TODO What is it like?
+- TODO Can we parse it?
+ */
+extern crate yaml_rust;
+use std::vec::Vec;
+use yaml_rust::{YamlLoader};
+
+fn parse_list_of<T: YamlParsable>(s: &yaml_rust::Yaml) -> Vec<T> {
+    s.as_vec().unwrap().into_iter().map(|x| T::from_yaml(x)).collect() 
+}
 
 
-*/
+trait YamlParsable {
+    // Given a Yaml mapping to a struct, parses and return an instance of it
+   fn from_yaml(s:&yaml_rust::Yaml) -> Self; 
+}
+
+struct RoomConfig {
+    name: String,
+    email: String,
+}
+
+impl YamlParsable for RoomConfig {
+    fn from_yaml(s:&yaml_rust::Yaml) -> RoomConfig {
+        return RoomConfig{
+            name: s["name"].as_str().unwrap().to_string(),
+            email: s["email"].as_str().unwrap().to_string()
+        }
+    }
+}
+
+struct Config {
+    small_rooms: Vec<RoomConfig>,
+    large_rooms: Vec<RoomConfig>
+}
+
+impl YamlParsable for Config {
+    fn from_yaml(s:&yaml_rust::Yaml) -> Config {
+        return Config {
+            small_rooms: parse_list_of(&s["rooms"]["small"]),
+            large_rooms: parse_list_of(&s["rooms"]["large"])
+        }
+    }
+}
+
+fn build_config(s: &str) -> Config{
+    let docs = YamlLoader::load_from_str(s).unwrap();
+    return Config::from_yaml(&docs[0])
+}
 
 #[test]
-fn foo() {
-    assert_eq!(4, 4);
+fn can_build_config() {
+    let s = "
+rooms:
+  small:
+    - name: Foo
+      email: foo@bar.com
+    - name: Bar
+      email: joe@baz.com
+  large:
+    - name: Bozorg
+      email: bozorg@jam.com
+";
+    let a = build_config(s);
+    assert_eq!(a.small_rooms[0].name, "Foo");
+    assert_eq!(a.large_rooms[0].email, "bozorg@jam.com")
 }
+
 
 
 

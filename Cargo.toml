@@ -5,3 +5,4 @@ authors = ["Laurent Charignon <l.charignon@gmail.com>"]
 
 [dependencies]
 bio = "*"
+yaml-rust = "0.4"
