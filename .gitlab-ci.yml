@@ -1,0 +1,11 @@
+stages:
+  - build
+
+build:
+  image: docker:latest
+  services:
+  - docker:dind
+  stage: build
+  script:
+    - docker build -t optirust-test -f Dockerfile .
+    - docker run --rm optirust-test

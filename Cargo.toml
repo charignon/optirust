@@ -6,3 +6,26 @@ authors = ["Laurent Charignon <l.charignon@gmail.com>"]
 [dependencies]
 bio = "*"
 yaml-rust = "0.4"
+chrono = "0.4"
+chrono-tz = "0.4"
+serde = "1.0"
+serde_yaml = "0.7"
+serde_derive = "1.0"
+google-calendar3 = "1.0.7+20171205"
+hyper = "0.10.3"
+hyper-rustls = "0.6.1"
+rayon = "0.9"
+yup-oauth2="*"
+
+[build-dependencies]
+clap = "2.26.0"
+version_check = "0.1.3"
+
+[dependencies.clap]
+version = "2.26.0"
+features = ["suggestions", "color", "wrap_help"]
+
+[lib]
+name = "dummy"
+path = "dummy.rs"
+
