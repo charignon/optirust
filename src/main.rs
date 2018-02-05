@@ -164,7 +164,6 @@ impl SolverInput {
 }
 
 fn to_solver_fmt(s: &SolverInput) -> String {
-    // Generate the optimal function from the scores
     let objective_string = format!("Maximize\nobj: {}\n", {
         s.candidates_scores
             .iter()
@@ -173,15 +172,6 @@ fn to_solver_fmt(s: &SolverInput) -> String {
             .join(" + ")
     });
 
-    let variables_string = format!("Binary\n{}\nEnd", {
-        s.candidates_scores
-            .iter()
-            .map(|it| format!("{}", it.0 ))
-            .collect::<Vec<String>>()
-            .join(" ")
-    });
-
-    // Generate the constraint for each meeting should happen
     let one_candidate_per_meeting_constraint_string = {
         s.candidate_per_desired_meeting
             .iter()
@@ -198,6 +188,14 @@ fn to_solver_fmt(s: &SolverInput) -> String {
             .join("\n")
     };
 
+    let variables_string = format!("Binary\n{}\nEnd", {
+        s.candidates_scores
+            .iter()
+            .map(|it| format!("{}", it.0 ))
+            .collect::<Vec<String>>()
+            .join(" ")
+    });
+
     format!("{}\n Subject To\n {} \n {} \n {}",
             objective_string,
             one_candidate_per_meeting_constraint_string,
@@ -206,12 +204,13 @@ fn to_solver_fmt(s: &SolverInput) -> String {
     )
 }
 
-fn read_res(candidates: &HashMap<String, MeetingCandidate>,
-            desired_meetings: &Vec<DesiredMeeting>
+fn read_res(
+    cbc_solver_result_filename: &str,
+    candidates: &HashMap<String, MeetingCandidate>,
+    desired_meetings: &Vec<DesiredMeeting>
 ) -> Option<HashMap<DesiredMeeting, MeetingCandidate>> {
-    let mut res: HashMap<DesiredMeeting, MeetingCandidate> = HashMap::new();
-    // If not optimal return None
-    let mut input = File::open("solution.sol").expect("file not found");
+
+    let mut input = File::open(cbc_solver_result_filename).expect("file not found");
     let mut contents = String::new();
     input.read_to_string(&mut contents)
         .expect("something went wrong reading the file");
@@ -224,6 +223,7 @@ fn read_res(candidates: &HashMap<String, MeetingCandidate>,
     let score = - k;
     println!("Total score is {}", score);
 
+    let mut res: HashMap<DesiredMeeting, MeetingCandidate> = HashMap::new();
     for l in lines {
         let words:Vec<&str> = l.split_whitespace().collect();
         let ident = words[1];
@@ -280,7 +280,7 @@ where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree> {
         .expect("failed to execute process, make sure cbc is in the path");
 
     // Expand the maximize function, score * candidate for all the candidates
-    match read_res(&candidates, &input.meetings) {
+    match read_res("solution.sol", &candidates, &input.meetings) {
         Some(m) => Solution{solved: true, candidates: m},
         None => Solution{solved: false, candidates: HashMap::new()}
     }
@@ -291,8 +291,9 @@ fn main() {
     let input = Input::from_file(matches.value_of("input").unwrap());
     let config = Config::from_file(matches.value_of("config").unwrap());
 
-    //if !all_identical_time_frame(&input.meetings) {
     if false {
+        // TODO enforce or lift this constraint
+        //if !all_identical_time_frame(&input.meetings) {
         eprintln!("Multiple time frame detected, call the program once for each time frame");
         process::exit(1);
     }
