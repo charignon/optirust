@@ -17,6 +17,9 @@ fn generate_meetings_for_date(
 
     let mut res:Vec<Meeting> = Vec::new();
     let mut t = date.and_time(mint).unwrap();
+    let lunch_start = date.and_time(chrono::NaiveTime::from_hms(12, 00, 00)).unwrap();
+    let lunch_end = date.and_time(chrono::NaiveTime::from_hms(13, 00, 00)).unwrap();
+
     loop {
         let start = t;
         let end = t + duration;
@@ -24,8 +27,7 @@ fn generate_meetings_for_date(
             break
         }
         t = t + step;
-        // Lunch
-        if (start.hour() > 12 && start.hour() < 13) || (end.hour() > 12 && end.hour() < 13) {
+        if (start < lunch_end) && (end > lunch_start) {
             continue
         }
         res.push(Meeting{

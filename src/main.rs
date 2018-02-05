@@ -1,6 +1,5 @@
 /* Project Optirust
 
-- TODO Fix lunch intersection
 - TODO Make it possible to accept day long event
 - TODO Fallback to other solver if cbc not available
 - TODO Relax constraint on step / duration and all meetings same start and end range
