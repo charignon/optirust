@@ -5,6 +5,8 @@
 - TODO Relax constraint on step / duration and all meetings same start and end range
 - TODO Make constraints configurable
 - TODO Factor out part that people might want to override
+- TODO Explain better how to use the program
+- TODO Test usability on a new host
 
  */
 extern crate bio;
