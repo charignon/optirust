@@ -55,7 +55,7 @@ pub fn generate_all_possible_meetings(tm: &DesiredMeeting) -> Vec<Meeting> {
             break
         }
         let wkday = date.weekday();
-        if //wkday == chrono::Weekday::Wed ||
+        if wkday == chrono::Weekday::Wed ||
            wkday == chrono::Weekday::Sat ||
            wkday == chrono::Weekday::Sun
         {

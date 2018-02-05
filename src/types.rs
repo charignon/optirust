@@ -101,6 +101,7 @@ pub struct RoomConfig {
 // A potential meeting, linked to a desired meeting
 #[derive(Clone)]
 pub struct MeetingCandidate {
+    pub title: String,
     pub id: String,
     pub start:DateTime<chrono::Utc>,
     pub end: DateTime<chrono::Utc>,
@@ -109,6 +110,7 @@ pub struct MeetingCandidate {
 }
 
 impl MeetingCandidate {
+    #[allow(dead_code)]
     pub fn intersects(&self, o: &MeetingCandidate) -> bool {
         return (self.start < o.end) && (o.start < self.end)
     }
@@ -128,14 +130,13 @@ impl fmt::Debug for MeetingCandidate {
 }
 impl fmt::Debug for Solution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Solved: {:?}\n", self.solved);
-        for (desired_meeting, candidate) in &self.candidates {
-            write!(f, "===============================\n");
-            write!(f, "{:?}\n", desired_meeting);
-            write!(f, ">>> {:?}\n", candidate);
-            write!(f, "===============================\n");
-        }
-        write!(f, "\n")
+        let solved = format!("Solved: {:?}\n", self.solved);
+        let candidates_str = self.candidates
+            .iter()
+            .map(|it| format!("{:?}\n >>> {:?}\n", it.0, it.1))
+            .collect::<Vec<String>>()
+            .join("===============================\n");
+        write!(f, "{}\n{}\n", solved, candidates_str)
     }
 }
 
