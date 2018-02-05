@@ -3,8 +3,7 @@ use types::{Meeting, DesiredMeeting};
 use chrono_tz::Tz;
 use chrono::prelude::*;
 use fixtures::{test_desired_meeting};
-// True if the YAML entry is a valid meeting, a valid meeting
-// is one that does not last for a full day
+
 // Generate intervals for a desired date, respecting mint, maxt, step and duration
 fn generate_meetings_for_date(
     date:chrono::Date<Tz>,

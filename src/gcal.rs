@@ -1,4 +1,3 @@
-// Should only care about Meeting, MeetingTree and MeetingRequest
 use types::{Meeting, MeetingsTree, Solution, DesiredMeeting, MeetingCandidate};
 
 use calendar3;
