@@ -14,8 +14,6 @@ extern crate chrono_tz;
 #[macro_use]
 extern crate clap;
 extern crate serde_yaml;
-#[macro_use]
-extern crate serde_derive;
 extern crate yaml_rust;
 extern crate google_calendar3 as calendar3;
 extern crate yup_oauth2 as oauth2;
@@ -23,20 +21,18 @@ extern crate hyper;
 extern crate hyper_rustls;
 extern crate rayon;
 use chrono::prelude::*;
-use std::io::prelude::*;
-use std::fs::File;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::process;
 use std::vec::Vec;
 use std::ops::Fn;
-use std::process::Command;
 
-mod fixtures;
 mod app;
+mod fixtures;
 mod gcal;
 mod gen;
+mod solver;
 mod types;
 
 use bio::data_structures::interval_tree::IntervalTree;
@@ -149,100 +145,6 @@ fn generate_meeting_candidate(tm: &DesiredMeeting,
         score: compute_score(&i.start, &i.end, &mandatory_attendees, &avail)
     })
 }
-#[derive(Debug, Serialize)]
-struct SolverInput {
-    intersections: Vec<Vec<String>>,
-    candidates_scores: HashMap<String, usize>,
-    candidate_per_desired_meeting: HashMap<String, Vec<String>>,
-}
-
-impl SolverInput {
-    fn new() -> SolverInput {
-        SolverInput {
-            intersections: Vec::new(),
-            candidates_scores: HashMap::new(),
-            candidate_per_desired_meeting: HashMap::new(),
-        }
-    }
-}
-
-fn to_solver_fmt(s: &SolverInput) -> String {
-    let objective_string = format!("Maximize\nobj: {}\n", {
-        s.candidates_scores
-            .iter()
-            .map(|it| format!("{} {}", it.1, it.0 ))
-            .collect::<Vec<String>>()
-            .join(" + ")
-    });
-
-    let one_candidate_per_meeting_constraint_string = {
-        s.candidate_per_desired_meeting
-            .iter()
-            .map(|it| format!("{} = 1", it.1.join(" + ")))
-            .collect::<Vec<String>>()
-            .join("\n")
-    };
-
-    let intersection_constraint_string = {
-        s.intersections
-            .iter()
-            .map(|it| format!("{} <= 1", it.join(" + ")))
-            .collect::<Vec<String>>()
-            .join("\n")
-    };
-
-    let variables_string = format!("Binary\n{}\nEnd", {
-        s.candidates_scores
-            .iter()
-            .map(|it| format!("{}", it.0 ))
-            .collect::<Vec<String>>()
-            .join(" ")
-    });
-
-    format!("{}\n Subject To\n {} \n {} \n {}",
-            objective_string,
-            one_candidate_per_meeting_constraint_string,
-            intersection_constraint_string,
-            variables_string
-    )
-}
-
-fn read_res(
-    cbc_solver_result_filename: &str,
-    candidates: &HashMap<String, MeetingCandidate>,
-    desired_meetings: &Vec<DesiredMeeting>
-) -> Option<HashMap<DesiredMeeting, MeetingCandidate>> {
-
-    let mut input = File::open(cbc_solver_result_filename).expect("file not found");
-    let mut contents = String::new();
-    input.read_to_string(&mut contents)
-        .expect("something went wrong reading the file");
-    let mut lines = contents.lines();
-    let first_line = lines.next().unwrap();
-    if !first_line.contains("Optimal") {
-        return None;
-    }
-    let k:f32 = first_line.split_whitespace().collect::<Vec<&str>>().last().unwrap().parse().unwrap();
-    let score = - k;
-    println!("Total score is {}", score);
-
-    let mut res: HashMap<DesiredMeeting, MeetingCandidate> = HashMap::new();
-    for l in lines {
-        let words:Vec<&str> = l.split_whitespace().collect();
-        let ident = words[1];
-        let val = words[2];
-        if val == "1" {
-            let candidate = candidates.get(ident).unwrap();
-            let desired_meeting = desired_meetings
-                .iter()
-                .find(|k| k.title == candidate.title)
-                .unwrap();
-
-            res.insert(desired_meeting.clone(), candidate.clone());
-        }
-    }
-    return Some(res);
-}
 
 fn generate_solution<F>(
     fetch: F,
@@ -252,42 +154,44 @@ fn generate_solution<F>(
 where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree> {
 
     let avail:HashMap<String, MeetingsTree> = fetch(extract_attendees(input, config));
-    let mut solver_input = SolverInput::new();
+    let mut solver_input = solver::SolverInput::new();
     let mut id = 0;
-    let mut candidates:HashMap<String, MeetingCandidate> = HashMap::new();
+    solver_input.desired_meetings = input.meetings.clone();
 
-    // All the candidates should go in a mapping of String to candidate
-    // They should also go in a tree and be given an id
     let mut tree:IntervalTree<DateTime<chrono::Utc>, String> = IntervalTree::new();
 
+    // Build the tree of all the candidates as well as the list of
+    // candidates and groupping of candidates for each desired meetings
     println!("First loop!");
     for me in &input.meetings {
         for interval in gen::generate_all_possible_meetings(&me) {
             let ident = format!("id{}", id);
             if let Some(m) = generate_meeting_candidate(me, &avail, &config, ident.clone() , &interval) {
-                solver_input.candidates_scores.insert(ident.to_string(), m.score);
-                candidates.insert(ident.to_string(), m);
+                solver_input.candidates.insert(ident.to_string(), m);
                 id += 1;
-                solver_input.candidate_per_desired_meeting.entry(me.title.to_string()).or_insert(Vec::new()).push(ident.to_string());
+                solver_input.candidate_per_desired_meeting
+                    .entry(me.title.to_string())
+                    .or_insert(Vec::new())
+                    .push(ident.to_string());
                 tree.insert(interval.start..interval.end, ident.to_string());
             }
         }
     }
 
     let mut intersections_set:HashSet<String> = HashSet::new();
-    // Second loop
-    // For each interval check if it intersects with other things from the tree
-    // And figure out a way to hash them (id concat), compute the intersections
+
+    // For each candidate check if it intersects with other things from the tree
+    // aggregate all the pair of intervals that intersect
     println!("Second loop!");
-    for c in &candidates {
+    for c in &solver_input.candidates {
         let ref ident = c.0;
         let mut intersect = tree.find(c.1.start..c.1.end).map(|r| r.data().to_string()).collect::<Vec<String>>();
         for k in &intersect {
             if k != *ident {
                 let (small, big) = if k < *ident {
-                (k, *ident)
+                    (k, *ident)
                 } else {
-                (*ident, k)
+                    (*ident, k)
                 };
                 let combined = vec![small.to_string(), big.to_string()];
                 let combined_ident = combined.clone().join("-");
@@ -299,17 +203,9 @@ where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree> {
         }
     }
 
-    println!("Solver!");
-    let mut buffer = File::create("temp.lp").unwrap();
-    buffer.write(to_solver_fmt(&solver_input).as_bytes()).expect("Cannot write to disk!");
-
-    Command::new("cbc")
-        .args(&["temp.lp", "solve", "solution", "solution.sol"])
-        .output()
-        .expect("failed to execute process, make sure cbc is in the path");
-
-    // Expand the maximize function, score * candidate for all the candidates
-    match read_res("solution.sol", &candidates, &input.meetings) {
+    // Feed all the input to the solver to find an optimal solution
+    println!("Calling solver!");
+    match solver::solve(&solver_input) {
         Some(m) => Solution{solved: true, candidates: m},
         None => Solution{solved: false, candidates: HashMap::new()}
     }
