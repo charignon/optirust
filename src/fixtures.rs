@@ -11,7 +11,7 @@ meetings:
     - foo.bar@laurent.com
     min_date: 2018-02-08 10:00:00
     max_date: 2018-02-20 18:00:00
-  - title: title 
+  - title: title
     description: description 2
     attendees:
     - laurent.charignon@foo.com

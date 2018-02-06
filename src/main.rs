@@ -1,11 +1,11 @@
 /* Project Optirust
 
+- TODO Better testing!
 - TODO Make it possible to accept day long event
 - TODO Make constraints configurable
 - TODO Factor out part that people might want to override
 - TODO Explain better how to use the program
 - TODO Test usability on a new host
-- TODO Better testing!
 
  */
 extern crate bio;

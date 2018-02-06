@@ -80,9 +80,9 @@ fn test_generate_interval() {
     // Removing the lunch both days, how many intervals are there?
     // Morning (2)
     // 11 to 1130 1130 to 12
-    // Afternoon(8)
-    // 12 to 1230 // 1230 to 1 // 1 to 130 // 130 to 2 // 2 to 230 // 230 to 3
+    // Afternoon(6)
+    // 1 to 130 // 130 to 2 // 2 to 230 // 230 to 3
     // 3 to 330 // 330 to 4
     // So 20 intervals total
-    assert_eq!(intervals.len(), 20);
+    assert_eq!(intervals.len(), 16);
 }
