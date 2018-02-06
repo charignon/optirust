@@ -152,52 +152,56 @@ fn generate_solution<F>(
     config: &Config
 ) -> Solution
 where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree> {
-
-    let avail:HashMap<String, MeetingsTree> = fetch(extract_attendees(input, config));
+    // the goal of the function is to build the input for the solver
+    // This will be fed to the solver at the end of the function
     let mut solver_input = solver::SolverInput::new();
-    let mut id = 0;
     solver_input.desired_meetings = input.meetings.clone();
 
-    let mut tree:IntervalTree<DateTime<chrono::Utc>, String> = IntervalTree::new();
 
-    // Build the tree of all the candidates as well as the list of
-    // candidates and groupping of candidates for each desired meetings
+    // Build the tree of all the candidates as well as three of the solver's input
+    // fields: the list of candidates and groupping of candidates for each desired meetings
+    let mut tree:IntervalTree<DateTime<chrono::Utc>, String> = IntervalTree::new();
     println!("First loop!");
-    for me in &input.meetings {
-        for interval in gen::generate_all_possible_meetings(&me) {
-            let ident = format!("id{}", id);
-            if let Some(m) = generate_meeting_candidate(me, &avail, &config, ident.clone() , &interval) {
-                solver_input.candidates.insert(ident.to_string(), m);
-                id += 1;
-                solver_input.candidate_per_desired_meeting
-                    .entry(me.title.to_string())
-                    .or_insert(Vec::new())
-                    .push(ident.to_string());
-                tree.insert(interval.start..interval.end, ident.to_string());
+    {
+        let avail:HashMap<String, MeetingsTree> = fetch(extract_attendees(input, config));
+        let mut id = 0;
+        for me in &input.meetings {
+            for interval in gen::generate_all_possible_meetings(&me) {
+                let ident = format!("id{}", id);
+                if let Some(m) = generate_meeting_candidate(me, &avail, &config, ident.clone() , &interval) {
+                    solver_input.candidates.insert(ident.to_string(), m);
+                    id += 1;
+                    solver_input.candidate_per_desired_meeting
+                        .entry(me.title.to_string())
+                        .or_insert(Vec::new())
+                        .push(ident.to_string());
+                    tree.insert(interval.start..interval.end, ident.to_string());
+                }
             }
         }
     }
 
-    let mut intersections_set:HashSet<String> = HashSet::new();
-
     // For each candidate check if it intersects with other things from the tree
     // aggregate all the pair of intervals that intersect
     println!("Second loop!");
-    for c in &solver_input.candidates {
-        let ref ident = c.0;
-        let mut intersect = tree.find(c.1.start..c.1.end).map(|r| r.data().to_string()).collect::<Vec<String>>();
-        for k in &intersect {
-            if k != *ident {
-                let (small, big) = if k < *ident {
-                    (k, *ident)
-                } else {
-                    (*ident, k)
-                };
-                let combined = vec![small.to_string(), big.to_string()];
-                let combined_ident = combined.clone().join("-");
-                if !intersections_set.contains(&combined_ident) {
-                    solver_input.intersections.push(combined.clone());
-                    intersections_set.insert(combined_ident.clone());
+    {
+        let mut intersections_set:HashSet<String> = HashSet::new();
+        for c in &solver_input.candidates {
+            let ref ident = c.0;
+            let mut intersect = tree.find(c.1.start..c.1.end).map(|r| r.data().to_string()).collect::<Vec<String>>();
+            for k in &intersect {
+                if k != *ident {
+                    let (small, big) = if k < *ident {
+                        (k, *ident)
+                    } else {
+                        (*ident, k)
+                    };
+                    let combined = vec![small.to_string(), big.to_string()];
+                    let combined_ident = combined.clone().join("-");
+                    if !intersections_set.contains(&combined_ident) {
+                        solver_input.intersections.push(combined.clone());
+                        intersections_set.insert(combined_ident.clone());
+                    }
                 }
             }
         }
@@ -205,7 +209,7 @@ where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree> {
 
     // Feed all the input to the solver to find an optimal solution
     println!("Calling solver!");
-    match solver::solve(&solver_input) {
+    match solver::solve_with_cbc_solver(&solver_input) {
         Some(m) => Solution{solved: true, candidates: m},
         None => Solution{solved: false, candidates: HashMap::new()}
     }

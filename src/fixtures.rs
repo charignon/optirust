@@ -41,3 +41,10 @@ pub fn test_desired_meeting() -> DesiredMeeting {
     let a = Input::from_yaml_str(&test_input());
     return a.meetings[1].clone();
 }
+
+#[allow(dead_code)]
+pub fn sample_cbc_solution() -> String {
+    "Optimal - objective value -2422.00000000
+   3576 id10873                 1                   -1161
+  18404 id0                     1                   -1261".to_string()
+}
