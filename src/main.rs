@@ -1,12 +1,11 @@
 /* Project Optirust
 
 - TODO Make it possible to accept day long event
-- TODO Fallback to other solver if cbc not available
-- TODO Relax constraint on step / duration and all meetings same start and end range
 - TODO Make constraints configurable
 - TODO Factor out part that people might want to override
 - TODO Explain better how to use the program
 - TODO Test usability on a new host
+- TODO Better testing!
 
  */
 extern crate bio;
@@ -23,6 +22,7 @@ extern crate yup_oauth2 as oauth2;
 extern crate hyper;
 extern crate hyper_rustls;
 extern crate rayon;
+use chrono::prelude::*;
 use std::io::prelude::*;
 use std::fs::File;
 use std::collections::HashMap;
@@ -39,6 +39,7 @@ mod gcal;
 mod gen;
 mod types;
 
+use bio::data_structures::interval_tree::IntervalTree;
 use fixtures::{test_input, test_config};
 use types::{Input, Config, DesiredMeeting, MeetingsTree,
             RoomConfig, MeetingCandidate, Solution, Meeting};
@@ -229,13 +230,16 @@ fn read_res(
     for l in lines {
         let words:Vec<&str> = l.split_whitespace().collect();
         let ident = words[1];
-        let candidate = candidates.get(ident).unwrap();
-        let desired_meeting = desired_meetings
-            .iter()
-            .find(|k| k.title == candidate.title)
-            .unwrap();
+        let val = words[2];
+        if val == "1" {
+            let candidate = candidates.get(ident).unwrap();
+            let desired_meeting = desired_meetings
+                .iter()
+                .find(|k| k.title == candidate.title)
+                .unwrap();
 
-        res.insert(desired_meeting.clone(), candidate.clone());
+            res.insert(desired_meeting.clone(), candidate.clone());
+        }
     }
     return Some(res);
 }
@@ -248,31 +252,54 @@ fn generate_solution<F>(
 where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree> {
 
     let avail:HashMap<String, MeetingsTree> = fetch(extract_attendees(input, config));
-    let intervals = gen::generate_all_possible_meetings(&input.meetings[0]);
     let mut solver_input = SolverInput::new();
     let mut id = 0;
     let mut candidates:HashMap<String, MeetingCandidate> = HashMap::new();
 
-    // This assumes that all the intervals are the same for all the meetings
-    // and step <= duration
-    // TODO Fix this assumption!
-    for i in &intervals {
-        let mut intersection:Vec<String> = Vec::new();
-        for it in &input.meetings {
+    // All the candidates should go in a mapping of String to candidate
+    // They should also go in a tree and be given an id
+    let mut tree:IntervalTree<DateTime<chrono::Utc>, String> = IntervalTree::new();
+
+    println!("First loop!");
+    for me in &input.meetings {
+        for interval in gen::generate_all_possible_meetings(&me) {
             let ident = format!("id{}", id);
-            if let Some(m) = generate_meeting_candidate(it, &avail, &config, ident.clone() , &i) {
+            if let Some(m) = generate_meeting_candidate(me, &avail, &config, ident.clone() , &interval) {
                 solver_input.candidates_scores.insert(ident.to_string(), m.score);
                 candidates.insert(ident.to_string(), m);
-                intersection.push(ident.to_string());
                 id += 1;
-                solver_input.candidate_per_desired_meeting.entry(it.title.to_string()).or_insert(Vec::new()).push(ident.to_string());
+                solver_input.candidate_per_desired_meeting.entry(me.title.to_string()).or_insert(Vec::new()).push(ident.to_string());
+                tree.insert(interval.start..interval.end, ident.to_string());
             }
-        }
-        if intersection.len() > 1 {
-            solver_input.intersections.push(intersection);
         }
     }
 
+    let mut intersections_set:HashSet<String> = HashSet::new();
+    // Second loop
+    // For each interval check if it intersects with other things from the tree
+    // And figure out a way to hash them (id concat), compute the intersections
+    println!("Second loop!");
+    for c in &candidates {
+        let ref ident = c.0;
+        let mut intersect = tree.find(c.1.start..c.1.end).map(|r| r.data().to_string()).collect::<Vec<String>>();
+        for k in &intersect {
+            if k != *ident {
+                let (small, big) = if k < *ident {
+                (k, *ident)
+                } else {
+                (*ident, k)
+                };
+                let combined = vec![small.to_string(), big.to_string()];
+                let combined_ident = combined.clone().join("-");
+                if !intersections_set.contains(&combined_ident) {
+                    solver_input.intersections.push(combined.clone());
+                    intersections_set.insert(combined_ident.clone());
+                }
+            }
+        }
+    }
+
+    println!("Solver!");
     let mut buffer = File::create("temp.lp").unwrap();
     buffer.write(to_solver_fmt(&solver_input).as_bytes()).expect("Cannot write to disk!");
 
@@ -292,13 +319,6 @@ fn main() {
     let matches = app::build_app().get_matches();
     let input = Input::from_file(matches.value_of("input").unwrap());
     let config = Config::from_file(matches.value_of("config").unwrap());
-
-    if false {
-        // TODO enforce or lift this constraint
-        //if !all_identical_time_frame(&input.meetings) {
-        eprintln!("Multiple time frame detected, call the program once for each time frame");
-        process::exit(1);
-    }
 
     let sol = generate_solution(
         fetch_availability_with_api,
