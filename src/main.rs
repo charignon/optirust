@@ -1,12 +1,13 @@
 /* Project Optirust
 
 
+- TODO Better testing for generate_solution!
 - TODO Flag to ignore the non accepted meeting
 - TODO Make it possible to accept day long event
+- TODO Make sure the code works when no room specified
 
 - TODO Make the input parsing a desired meeting parsing and remove one type
 - TODO Make constraints configurable using a config file
-- TODO Better testing for generate_solution!
 - TODO Add example files in a separate folder
 - TODO Explain better how to use the program
 - TODO Test usability on a new host
@@ -45,6 +46,74 @@ use bio::data_structures::interval_tree::IntervalTree;
 use fixtures::{test_input, test_config};
 use types::{Input, Config, DesiredMeeting, MeetingsTree,
             RoomConfig, MeetingCandidate, Solution, Meeting};
+
+
+type ScoringFnType = Box<Fn(
+    &chrono::DateTime<Utc>, &chrono::DateTime<Utc>,
+    &Vec<String>, &HashMap<String, MeetingsTree>) -> usize>;
+type RejectDateTimeFnType = Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>;
+type RejectDateFnType = Box<Fn(chrono::Date<Tz>) -> bool>;
+type RoomPickerFnType = Box<Fn(usize) -> Vec<String>>;
+type SolverFnType = Box<Fn(&solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>>;
+type FetchFnType = Box<Fn(Vec<String>) -> HashMap<String, MeetingsTree>>;
+
+// Options is a struct to represent all the tweakable part of the workflow
+// it can be used to modify the behavior of the whole program for example by
+// swapping scoring functions, fetching strategy or room picking algorithm.
+// It should we built at the high level from the user input.
+struct Options {
+    // How to fetch the meetings from the API
+    // Default: fetching in // with google calendar
+    fetch_fn: FetchFnType,
+
+    // How to solve the problem
+    // Default: use a CBC solver
+    solver_fn: SolverFnType,
+
+    // Given the size of a meeting returns a list of email addresses of rooms where it
+    // could happen.
+    // Default: no room booked
+    room_picker_fn: RoomPickerFnType,
+
+    // Function to decide what day to reject. You can use that to reject meetings on
+    // weekend for example
+    // Default: reject Wednesdays and weekend
+    reject_date_fn: RejectDateFnType,
+
+    // Function what slot to reject, you can use that to reject meetings over
+    // lunch for example
+    // Default: reject meeting over lunch (12 to 1pm)
+    reject_datetime_fn: RejectDateTimeFnType,
+
+    // Scoring function
+    // Default: score is high for clustered meetings (to avoid fragmentation)
+    scoring_fn: ScoringFnType,
+
+    // TODO Use this, currently unused
+    // If true will ignore all day events when scheduling
+    // Default: true, we ignore all day events
+    ignore_all_day_events: bool,
+
+    // TODO Use
+    // If true will consider pending meeting busy and not try to schedule over them
+    // default: true
+    consider_pending_meetings_busy: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            fetch_fn: Box::new(gcal::fetch_availability_with_api),
+            solver_fn: Box::new(solver::solve_with_cbc_solver),
+            scoring_fn: Box::new(compute_score),
+            ignore_all_day_events: true,
+            consider_pending_meetings_busy: true,
+            room_picker_fn: Box::new(|_| vec![]),
+            reject_date_fn: Box::new(gen::default_reject_date),
+            reject_datetime_fn: Box::new(gen::default_reject_datetime),
+        }
+    }
+}
 
 // Extract email address from a vec of RoomConfig
 fn rooms_vec_to_emails(v: &Vec<RoomConfig>) -> Vec<String> {
@@ -146,7 +215,7 @@ fn generate_meeting_candidate(
 // to the scheduling problem using a given solving strategy
 fn generate_solution(
     desired_meetings: &Vec<DesiredMeeting>,
-    opts: &SolverOptions
+    opts: &Options
 ) -> Solution {
     // the goal of the function is to build the input for the solver
     // This will be fed to the solver at the end of the function
@@ -211,75 +280,23 @@ fn generate_solution(
     }
 }
 
-type ScoringFnType = Box<Fn(
-    &chrono::DateTime<Utc>, &chrono::DateTime<Utc>,
-    &Vec<String>, &HashMap<String, MeetingsTree>) -> usize>;
-type RejectDateTimeFnType = Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>;
-type RejectDateFnType = Box<Fn(chrono::Date<Tz>) -> bool>;
-type RoomPickerFnType = Box<Fn(usize) -> Vec<String>>;
-type SolverFnType = Box<Fn(&solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>>;
-type FetchFnType = Box<Fn(Vec<String>) -> HashMap<String, MeetingsTree>>;
-// From the user config we can generate the solver option
-struct SolverOptions {
-    // How to fetch the meetings from the API
-    fetch_fn: FetchFnType,
-
-    // How to solve the problem, default is to use a CBC solver
-    solver_fn: SolverFnType,
-
-    // Given the size of a meeting returns a list of email addresses of rooms where it
-    // could happen.
-    room_picker_fn: RoomPickerFnType,
-
-    // Function to decide what day to reject. You can use that to reject meetings on
-    // weekend for example
-    reject_date_fn: RejectDateFnType,
-
-    // Function what slot to reject, you can use that to reject meetings over
-    // lunch for example
-    reject_datetime_fn: RejectDateTimeFnType,
-
-    // Scoring function
-    scoring_fn: ScoringFnType,
-
-    // TODO Use
-    // If true will ignore all day events when scheduling
-    ignore_all_day_events: bool,
-
-    // TODO Use
-    // If true will ignore the pending meetings (not accepted by people) when
-    // considering a slot for scheduling
-    ignore_pending_meetings: bool,
-}
-
 fn main() {
     let matches = app::build_app().get_matches();
-    let input = Input::from_file(
-        matches.value_of("input").expect("Please give a valid input file")
-    );
-    let room_picker = {
+    let options = {
         let config = Config::from_file(
             matches.value_of("config").expect("Please give a valid config file")
         );
-
-        move |k| default_room_picker(k, &config)
+        Options{
+            room_picker_fn: Box::new(move |k| default_room_picker(k, &config)),
+            ..Default::default()
+        }
     };
 
-    let solver_options = SolverOptions {
-        fetch_fn: Box::new(gcal::fetch_availability_with_api),
-        solver_fn: Box::new(solver::solve_with_cbc_solver),
-        scoring_fn: Box::new(compute_score),
-        ignore_all_day_events: false,
-        ignore_pending_meetings: false,
-        room_picker_fn: Box::new(room_picker),
-        reject_date_fn: Box::new(gen::default_reject_date),
-        reject_datetime_fn: Box::new(gen::default_reject_datetime),
-    };
-
-    let sol = generate_solution(
-        &input.meetings,
-        &solver_options
+    let input = Input::from_file(
+        matches.value_of("input").expect("Please give a valid input file")
     );
+
+    let sol = generate_solution(&input.meetings, &options);
 
     if !sol.solved {
         eprintln!("Cannot find meetings to solve the constraints!");
