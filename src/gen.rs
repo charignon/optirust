@@ -12,14 +12,12 @@ fn generate_meetings_for_date(
     maxt:chrono::NaiveTime,
     step:chrono::Duration,
     duration:chrono::Duration,
-    id:String)
-    -> Vec<Meeting> {
+    id:String,
+    reject_datetime_fn: &Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>
+) -> Vec<Meeting> {
 
     let mut res:Vec<Meeting> = Vec::new();
     let mut t = date.and_time(mint).unwrap();
-    let lunch_start = date.and_time(chrono::NaiveTime::from_hms(12, 00, 00)).unwrap();
-    let lunch_end = date.and_time(chrono::NaiveTime::from_hms(13, 00, 00)).unwrap();
-
     loop {
         let start = t;
         let end = t + duration;
@@ -27,7 +25,7 @@ fn generate_meetings_for_date(
             break
         }
         t = t + step;
-        if (start < lunch_end) && (end > lunch_start) {
+        if reject_datetime_fn(start, end) {
             continue
         }
         res.push(Meeting{
@@ -39,8 +37,28 @@ fn generate_meetings_for_date(
     res
 }
 
+#[inline(always)]
+pub fn default_reject_date(date: chrono::Date<Tz>) -> bool {
+    let wkday = date.weekday();
+    (wkday == chrono::Weekday::Wed ||
+     wkday == chrono::Weekday::Sat ||
+     wkday == chrono::Weekday::Sun)
+}
+
+#[inline(always)]
+pub fn default_reject_datetime(start: chrono::DateTime<Tz>, end: chrono::DateTime<Tz>) -> bool {
+    let date = start.date();
+    let lunch_start = date.and_time(chrono::NaiveTime::from_hms(12, 00, 00)).unwrap();
+    let lunch_end = date.and_time(chrono::NaiveTime::from_hms(13, 00, 00)).unwrap();
+    (start < lunch_end) && (end > lunch_start)
+}
+
 // Generate intervals for a desired meeting
-pub fn generate_all_possible_meetings(tm: &DesiredMeeting) -> Vec<Meeting> {
+pub fn generate_all_possible_meetings(
+    tm: &DesiredMeeting,
+    reject_date_fn: &Box<Fn(chrono::Date<Tz>) -> bool>,
+    reject_datetime_fn: &Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>
+) -> Vec<Meeting> {
     // Start date to end date, every day
     // Skip Wednesday, Saturday and Sunday
     // Call generate interval for a day
@@ -56,17 +74,14 @@ pub fn generate_all_possible_meetings(tm: &DesiredMeeting) -> Vec<Meeting> {
         if date > end_date.date() {
             break
         }
-        let wkday = date.weekday();
-        if wkday == chrono::Weekday::Wed ||
-           wkday == chrono::Weekday::Sat ||
-           wkday == chrono::Weekday::Sun
+        if reject_date_fn(date)
         {
             date = date + chrono::Duration::days(1);
             continue;
         }
 
         res.extend(
-            generate_meetings_for_date(date, mint, maxt, tm.step, tm.duration, tm.title.clone())
+            generate_meetings_for_date(date, mint, maxt, tm.step, tm.duration, tm.title.clone(), reject_datetime_fn)
         );
         date = date + chrono::Duration::days(1);
     }
@@ -75,7 +90,13 @@ pub fn generate_all_possible_meetings(tm: &DesiredMeeting) -> Vec<Meeting> {
 
 #[test]
 fn test_generate_interval() {
-    let intervals =  generate_all_possible_meetings(&test_desired_meeting());
+    let a:Box<Fn(chrono::Date<Tz>) -> bool> = Box::new(default_reject_date);
+    let b:Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>= Box::new(default_reject_datetime);
+    let intervals =  generate_all_possible_meetings(
+        &test_desired_meeting(),
+        &a,
+        &b
+    );
     // from 11 am to 4 PM on Thursday and Friday, the Saturday is ignored
     // Removing the lunch both days, how many intervals are there?
     // Morning (2)

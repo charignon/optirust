@@ -1,11 +1,12 @@
 /* Project Optirust
 
-- TODO Make solver accept SolverOption
-- TODO Better testing for generate_solution!
+
 - TODO Flag to ignore the non accepted meeting
 - TODO Make it possible to accept day long event
-- TODO Make constraints configurable
-- TODO Factor out part that people might want to override
+
+- TODO Make the input parsing a desired meeting parsing and remove one type
+- TODO Make constraints configurable using a config file
+- TODO Better testing for generate_solution!
 - TODO Add example files in a separate folder
 - TODO Explain better how to use the program
 - TODO Test usability on a new host
@@ -45,40 +46,21 @@ use fixtures::{test_input, test_config};
 use types::{Input, Config, DesiredMeeting, MeetingsTree,
             RoomConfig, MeetingCandidate, Solution, Meeting};
 
-use gcal::{book_with_api, fetch_availability_with_api};
-
 // Extract email address from a vec of RoomConfig
 fn rooms_vec_to_emails(v: &Vec<RoomConfig>) -> Vec<String> {
     v.into_iter().map(|k| k.email.to_string()).collect::<Vec<String>>()
 }
 
 // Extract the list of attendees emails from the input and config
-fn extract_attendees(i: &Input, c: &Config) -> Vec<String> {
+fn extract_attendees(i: &Vec<DesiredMeeting>, c: &RoomPickerFnType) -> Vec<String>
+{
     let mut s: HashSet<String> = HashSet::new();
-    s.extend(rooms_vec_to_emails(&c.small_rooms));
-    s.extend(rooms_vec_to_emails(&c.large_rooms));
-
-    for m in &i.meetings {
-        s.extend(m.attendees.iter().map(|k| k.to_string()).collect::<Vec<String>>());
+    for m in i {
+        let attendees = m.attendees.iter().map(|k| k.to_string()).collect::<Vec<String>>();
+        s.extend(c(attendees.len()));
+        s.extend(attendees);
     }
     Vec::from_iter(s.into_iter())
-}
-
-#[test]
-fn test_extract_attendees() {
-    let mut a = extract_attendees(
-        &Input::from_yaml_str(&test_input()),
-        &Config::from_yaml_str(&test_config())
-    );
-    a.sort();
-    assert_eq!(a,
-               ["bozorg@jam.com",
-                "contact@laurent.com",
-                "foo.bar@laurent.com",
-                "foo@bar.com",
-                "joe@baz.com",
-                "laurent.charignon@foo.com"]
-)
 }
 
 // Compute the score for a slot given list of attendees and their availability
@@ -114,18 +96,17 @@ fn default_room_picker(size: usize, config: &Config) -> Vec<String>{
 
 // Generated a candidate for a desired meeting for the interval specified by Meeting
 // None if not possible (no availability)
-fn generate_meeting_candidate<R>(
+fn generate_meeting_candidate(
     tm: &DesiredMeeting,
     avail: &HashMap<String, MeetingsTree>,
-    config: &Config,
     ident: String,
-    room_picker: R,
+    room_picker: &RoomPickerFnType,
+    scoring_fn: &ScoringFnType,
     i: &Meeting
 ) -> Option<MeetingCandidate>
-where R: Fn(usize, &Config) -> Vec<String>
 {
 
-    let possible_rooms:Vec<String> = room_picker(tm.attendees.len(), config);
+    let possible_rooms:Vec<String> = room_picker(tm.attendees.len());
     let mandatory_attendees = &tm.attendees;
     let conflicts:usize = mandatory_attendees
         .iter()
@@ -157,27 +138,20 @@ where R: Fn(usize, &Config) -> Vec<String>
         start: i.start,
         end: i.end,
         room: suitable_room.unwrap(),
-        score: compute_score(&i.start, &i.end, &mandatory_attendees, &avail)
+        score: scoring_fn(&i.start, &i.end, &mandatory_attendees, &avail)
     })
 }
 
 // Given a fetch function (to fetch availability), input and output return a solution
 // to the scheduling problem using a given solving strategy
-fn generate_solution<F, G, R>(
-    fetch: F,
-    solving_strategy: G,
-    room_picker: R,
-    input: &Input,
-    config: &Config
-) -> Solution
-where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree>,
-      G: Fn(&solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>,
-      R: Fn(usize, &Config) -> Vec<String>
-{
+fn generate_solution(
+    desired_meetings: &Vec<DesiredMeeting>,
+    opts: &SolverOptions
+) -> Solution {
     // the goal of the function is to build the input for the solver
     // This will be fed to the solver at the end of the function
     let mut solver_input = solver::SolverInput::new();
-    solver_input.desired_meetings = input.meetings.clone();
+    solver_input.desired_meetings = desired_meetings.clone();
 
 
     // Build the tree of all the candidates as well as three of the solver's input
@@ -185,12 +159,12 @@ where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree>,
     let mut tree:IntervalTree<DateTime<chrono::Utc>, String> = IntervalTree::new();
     println!("First loop!");
     {
-        let avail:HashMap<String, MeetingsTree> = fetch(extract_attendees(input, config));
+        let avail:HashMap<String, MeetingsTree> = (opts.fetch_fn)(extract_attendees(desired_meetings, &opts.room_picker_fn));
         let mut id = 0;
-        for me in &input.meetings {
-            for interval in gen::generate_all_possible_meetings(&me) {
+        for me in desired_meetings {
+            for interval in gen::generate_all_possible_meetings(&me, &opts.reject_date_fn, &opts.reject_datetime_fn) {
                 let ident = format!("id{}", id);
-                if let Some(m) = generate_meeting_candidate(me, &avail, &config, ident.clone(), &room_picker, &interval) {
+                if let Some(m) = generate_meeting_candidate(me, &avail, ident.clone(), &opts.room_picker_fn, &opts.scoring_fn, &interval) {
                     solver_input.candidates.insert(ident.to_string(), m);
                     id += 1;
                     solver_input.candidate_per_desired_meeting
@@ -231,41 +205,48 @@ where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree>,
 
     // Feed all the input to the solver to find an optimal solution
     println!("Calling solver!");
-    match solving_strategy(&solver_input) {
+    match (opts.solver_fn)(&solver_input) {
         Some(m) => Solution{solved: true, candidates: m},
         None => Solution{solved: false, candidates: HashMap::new()}
     }
 }
 
+type ScoringFnType = Box<Fn(
+    &chrono::DateTime<Utc>, &chrono::DateTime<Utc>,
+    &Vec<String>, &HashMap<String, MeetingsTree>) -> usize>;
+type RejectDateTimeFnType = Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>;
+type RejectDateFnType = Box<Fn(chrono::Date<Tz>) -> bool>;
+type RoomPickerFnType = Box<Fn(usize) -> Vec<String>>;
+type SolverFnType = Box<Fn(&solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>>;
+type FetchFnType = Box<Fn(Vec<String>) -> HashMap<String, MeetingsTree>>;
 // From the user config we can generate the solver option
 struct SolverOptions {
     // How to fetch the meetings from the API
-    fetch_fn: fn(emails: Vec<String>) -> HashMap<String, MeetingsTree>,
+    fetch_fn: FetchFnType,
 
     // How to solve the problem, default is to use a CBC solver
-    solver_fn: fn(input: &solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>,
+    solver_fn: SolverFnType,
 
     // Given the size of a meeting returns a list of email addresses of rooms where it
     // could happen.
-    room_picker_fn: fn(size: usize) -> Vec<String>,
+    room_picker_fn: RoomPickerFnType,
 
     // Function to decide what day to reject. You can use that to reject meetings on
     // weekend for example
-    reject_day_fn: fn(date: chrono::Date<Utc>) -> bool,
+    reject_date_fn: RejectDateFnType,
 
     // Function what slot to reject, you can use that to reject meetings over
     // lunch for example
-    reject_slot_fn: fn(datetime: chrono::DateTime<Tz>) -> bool,
+    reject_datetime_fn: RejectDateTimeFnType,
 
     // Scoring function
-    scoring_fn: fn(start: &chrono::DateTime<Tz>,
-                   end: &chrono::DateTime<Tz>,
-                   attendees: &Vec<String>,
-                   availability: &HashMap<String, MeetingsTree>),
+    scoring_fn: ScoringFnType,
 
+    // TODO Use
     // If true will ignore all day events when scheduling
     ignore_all_day_events: bool,
 
+    // TODO Use
     // If true will ignore the pending meetings (not accepted by people) when
     // considering a slot for scheduling
     ignore_pending_meetings: bool,
@@ -276,16 +257,28 @@ fn main() {
     let input = Input::from_file(
         matches.value_of("input").expect("Please give a valid input file")
     );
-    let config = Config::from_file(
-        matches.value_of("config").expect("Please give a valid config file")
-    );
+    let room_picker = {
+        let config = Config::from_file(
+            matches.value_of("config").expect("Please give a valid config file")
+        );
+
+        move |k| default_room_picker(k, &config)
+    };
+
+    let solver_options = SolverOptions {
+        fetch_fn: Box::new(gcal::fetch_availability_with_api),
+        solver_fn: Box::new(solver::solve_with_cbc_solver),
+        scoring_fn: Box::new(compute_score),
+        ignore_all_day_events: false,
+        ignore_pending_meetings: false,
+        room_picker_fn: Box::new(room_picker),
+        reject_date_fn: Box::new(gen::default_reject_date),
+        reject_datetime_fn: Box::new(gen::default_reject_datetime),
+    };
 
     let sol = generate_solution(
-        fetch_availability_with_api,   // Fetch function
-        solver::solve_with_cbc_solver, // Solving strategy
-        default_room_picker,           // Room picker
-        &input,
-        &config
+        &input.meetings,
+        &solver_options
     );
 
     if !sol.solved {
@@ -298,7 +291,7 @@ fn main() {
         0 => println!("Dry run mode, not booking!"),
         _ => {
             println!("Booking!");
-            book_with_api(&sol);
+            gcal::book_with_api(&sol);
         }
     }
 }
