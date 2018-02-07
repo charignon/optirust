@@ -1,11 +1,11 @@
 /* Project Optirust
 
-- TODO Enforce different titles
 - TODO Better testing for generate_solution!
 - TODO Flag to ignore the non accepted meeting
 - TODO Make it possible to accept day long event
 - TODO Make constraints configurable
 - TODO Factor out part that people might want to override
+- TODO Add example files in a separate folder
 - TODO Explain better how to use the program
 - TODO Test usability on a new host
 - TODO Log level
@@ -220,8 +220,12 @@ where F: Fn(Vec<String>) -> HashMap<String, MeetingsTree> {
 
 fn main() {
     let matches = app::build_app().get_matches();
-    let input = Input::from_file(matches.value_of("input").unwrap());
-    let config = Config::from_file(matches.value_of("config").unwrap());
+    let input = Input::from_file(
+        matches.value_of("input").expect("Please give a valid input file")
+    );
+    let config = Config::from_file(
+        matches.value_of("config").expect("Please give a valid config file")
+    );
 
     let sol = generate_solution(
         fetch_availability_with_api,
@@ -230,7 +234,6 @@ fn main() {
     );
 
     if !sol.solved {
-        println!("{:?}", sol);
         eprintln!("Cannot find meetings to solve the constraints!");
         process::exit(1);
     }

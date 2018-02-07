@@ -1,5 +1,7 @@
 use std::hash::{Hash, Hasher};
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 use std::io::prelude::*;
 use std::fs::File;
 
@@ -8,7 +10,7 @@ use chrono::prelude::*;
 use chrono;
 use chrono_tz::Tz;
 use yaml_rust;
-use fixtures::{test_input, test_config};
+use fixtures::{test_input, test_config, test_invalid_input};
 
 // The input to the program containing what meetings the user
 // wants to schedule
@@ -19,7 +21,9 @@ pub struct Input {
 impl Input {
     pub fn from_yaml_str(s: &str) -> Input{
         let docs = yaml_rust::YamlLoader::load_from_str(s).unwrap();
-        Input::from_yaml(&docs[0])
+        let input = Input::from_yaml(&docs[0]);
+        input.panic_if_invalid();
+        input
     }
 
     pub fn from_file(file: &str) -> Input {
@@ -29,7 +33,23 @@ impl Input {
             .expect("something went wrong reading the file");
         Input::from_yaml_str(&contents)
     }
+
+    fn panic_if_invalid(&self) {
+        let all_titles = self.meetings.iter().map(|k| k.title.to_string()).collect::<Vec<String>>();
+        let all_titles_count = all_titles.len();
+        let titles_set: HashSet<String> = HashSet::from_iter(all_titles.into_iter());
+        if titles_set.len() != all_titles_count {
+            panic!("Two meetings cannot have the same title");
+        }
+    }
 }
+
+#[test]
+#[should_panic]
+fn panic_two_desired_meeting_same_title() {
+    Input::from_yaml_str(&test_invalid_input());
+}
+
 #[test]
 fn can_build_input() {
     let a = Input::from_yaml_str(&test_input());
