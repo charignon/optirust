@@ -99,7 +99,7 @@ pub struct RoomConfig {
 }
 
 // A potential meeting, linked to a desired meeting
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct MeetingCandidate {
     pub title: String,
     pub id: String,

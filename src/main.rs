@@ -1,11 +1,14 @@
 /* Project Optirust
 
-- TODO Better testing!
+- TODO Enforce different titles
+- TODO Better testing for generate_solution!
+- TODO Flag to ignore the non accepted meeting
 - TODO Make it possible to accept day long event
 - TODO Make constraints configurable
 - TODO Factor out part that people might want to override
 - TODO Explain better how to use the program
 - TODO Test usability on a new host
+- TODO Log level
 
  */
 extern crate bio;

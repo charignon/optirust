@@ -3,6 +3,7 @@ use types::{DesiredMeeting, MeetingCandidate};
 use std::fs::File;
 use std::io::prelude::*;
 use std::process::Command;
+use fixtures;
 
 #[derive(Debug)]
 pub struct SolverInput {
@@ -19,7 +20,7 @@ pub fn solve_with_cbc_solver(s: &SolverInput) -> Option<HashMap<DesiredMeeting, 
     Command::new("cbc")
         .args(&["temp.lp", "solve", "solution", "solution.sol"])
         .output()
-        .expect("failed to execute process, make sure cbc is in the path");
+        .expect("failed to execute process, make sure 'cbc' is in yout path");
 
     let mut input = File::open("solution.sol").expect("file not found");
     let mut contents = String::new();
@@ -40,45 +41,74 @@ impl SolverInput {
     }
 
     fn to_lp_fmt(&self) -> String {
-        let objective_string = format!("Maximize\nobj: {}\n", {
-            self.candidates
+        let objective_string = format!("  obj: {}", {
+            let mut k = self.candidates
                 .iter()
                 .map(|it| format!("{} {}", it.1.score, it.0 ))
-                .collect::<Vec<String>>()
-                .join(" + ")
+                .collect::<Vec<String>>();
+            k.sort();
+            k.join(" + ")
         });
 
-        let one_candidate_per_meeting_constraint_string = {
+        let one_candidate_per_meeting_constraints = {
             self.candidate_per_desired_meeting
                 .iter()
-                .map(|it| format!("{} = 1", it.1.join(" + ")))
+                .map(|it| format!("  {} = 1", it.1.join(" + ")))
                 .collect::<Vec<String>>()
-                .join("\n")
         };
 
-        let intersection_constraint_string = {
+        let intersection_constraints = {
             self.intersections
                 .iter()
-                .map(|it| format!("{} <= 1", it.join(" + ")))
+                .map(|it| format!("  {} <= 1", it.join(" + ")))
                 .collect::<Vec<String>>()
-                .join("\n")
         };
 
-        let variables_string = format!("Binary\n{}\nEnd", {
-            self.candidates
+        let variables_string = {
+            let mut k = self.candidates
                 .iter()
                 .map(|it| format!("{}", it.0 ))
-                .collect::<Vec<String>>()
-                .join(" ")
-        });
+                .collect::<Vec<String>>();
+            k.sort();
+            format!("  {}", k.join(" "))
+        };
+        let mut constraints = one_candidate_per_meeting_constraints;
+        constraints.extend(intersection_constraints);
+        constraints.sort();
 
-        format!("{}\n Subject To\n {} \n {} \n {}",
+        format!("Maximize\n{}\nSubject To\n{}\nBinary\n{}\nEnd",
                 objective_string,
-                one_candidate_per_meeting_constraint_string,
-                intersection_constraint_string,
+                constraints.join("\n"),
                 variables_string
         )
     }
+}
+
+#[test]
+fn test_to_lp_fmt() {
+    let mut input = SolverInput::new();
+    let candidate_a =  fixtures::sample_candidate_a();
+    let candidate_b =  fixtures::sample_candidate_b();
+    let desired_meetings = fixtures::test_desired_meetings() ;
+
+    input.candidates.insert("id10873".to_string(), candidate_a.clone());
+    input.candidates.insert("id0".to_string(), candidate_b.clone());
+    input.desired_meetings.extend(desired_meetings.clone());
+    input.candidate_per_desired_meeting.insert("title".to_string(), vec!["id10873".to_string()]);
+    input.candidate_per_desired_meeting.insert("title2".to_string(), vec!["id0".to_string()]);
+
+    assert_eq!(
+        "Maximize
+  obj: 23 id0 + 23 id10873
+Subject To
+  id0 = 1
+  id10873 = 1
+Binary
+  id0 id10873
+End",
+        input.to_lp_fmt()
+    );
+
 }
 
 fn read_cbc_solver_solution(
@@ -111,5 +141,27 @@ fn read_cbc_solver_solution(
         }
     }
     return Some(res);
+}
+
+#[test]
+fn test_read_cbc_solver_solution_with_good_solver_input() {
+    let mut input = SolverInput::new();
+    let candidate_a =  fixtures::sample_candidate_a();
+    let candidate_b =  fixtures::sample_candidate_b();
+    let desired_meetings = fixtures::test_desired_meetings() ;
+
+    input.candidates.insert("id10873".to_string(), candidate_a.clone());
+    input.candidates.insert("id0".to_string(), candidate_b.clone());
+    input.desired_meetings.extend(desired_meetings.clone());
+
+    let mut expected_output = HashMap::new();
+    expected_output.insert(desired_meetings[0].clone(), candidate_a);
+    expected_output.insert(desired_meetings[1].clone(), candidate_b);
+
+    assert_eq!(
+        Some(expected_output),
+        read_cbc_solver_solution(&fixtures::sample_cbc_solution(), &input)
+    );
+
 }
 
