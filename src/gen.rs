@@ -70,6 +70,7 @@ pub fn generate_all_possible_meetings(
     let mut date = start_date.date();
     let mint = start_date.time();
     let maxt = end_date.time();
+    let mut id = 0;
     loop {
         if date > end_date.date() {
             break
@@ -80,10 +81,12 @@ pub fn generate_all_possible_meetings(
             continue;
         }
 
+        let ident = format!("{}_{}", tm.title, id);
         res.extend(
-            generate_meetings_for_date(date, mint, maxt, tm.step, tm.duration, tm.title.clone(), reject_datetime_fn)
+            generate_meetings_for_date(date, mint, maxt, tm.step, tm.duration, ident, reject_datetime_fn)
         );
         date = date + chrono::Duration::days(1);
+        id += 1
     }
     res
 }

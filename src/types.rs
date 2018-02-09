@@ -8,9 +8,102 @@ use std::fs::File;
 use bio::data_structures::interval_tree::IntervalTree;
 use chrono::prelude::*;
 use chrono;
+use gcal;
+use gen;
+use solver;
 use chrono_tz::Tz;
 use yaml_rust;
 use fixtures::{test_input, test_config, test_invalid_input};
+pub type ScoringFnType = Box<Fn(
+    &chrono::DateTime<Utc>, &chrono::DateTime<Utc>,
+    &Vec<String>, &HashMap<String, MeetingsTree>) -> usize>;
+pub type RejectDateTimeFnType = Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>;
+pub type RejectDateFnType = Box<Fn(chrono::Date<Tz>) -> bool>;
+pub type RoomPickerFnType = Box<Fn(usize) -> Vec<String>>;
+pub type SolverFnType = Box<Fn(&solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>>;
+pub type FetchFnType = Box<Fn(Vec<String>) -> HashMap<String, MeetingsTree>>;
+
+// Options is a struct to represent all the tweakable part of the workflow
+// it can be used to modify the behavior of the whole program for example by
+// swapping scoring functions, fetching strategy or room picking algorithm.
+// It should we built at the high level from the user input.
+pub struct Options {
+    // How to fetch the meetings from the API
+    // Default: fetching in // with google calendar
+    pub fetch_fn: FetchFnType,
+
+    // How to solve the problem
+    // Default: use a CBC solver
+    pub solver_fn: SolverFnType,
+
+    // Given the size of a meeting returns a list of email addresses of rooms where it
+    // could happen.
+    // Default: no room booked
+    pub room_picker_fn: RoomPickerFnType,
+
+    // Function to decide what day to reject. You can use that to reject meetings on
+    // weekend for example
+    // Default: reject Wednesdays and weekend
+    pub reject_date_fn: RejectDateFnType,
+
+    // Function what slot to reject, you can use that to reject meetings over
+    // lunch for example
+    // Default: reject meeting over lunch (12 to 1pm)
+    pub reject_datetime_fn: RejectDateTimeFnType,
+
+    // Scoring function
+    // Default: score is high for clustered meetings (to avoid fragmentation)
+    pub scoring_fn: ScoringFnType,
+
+    // TODO Use this, currently unused
+    // If true will ignore all day events when scheduling
+    // Default: true, we ignore all day events
+    pub ignore_all_day_events: bool,
+
+    // TODO Use
+    // If true will consider pending meeting busy and not try to schedule over them
+    // default: true
+    pub consider_pending_meetings_busy: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            fetch_fn: Box::new(gcal::fetch_availability_with_api),
+            solver_fn: Box::new(solver::solve_with_cbc_solver),
+            scoring_fn: Box::new(compute_score),
+            ignore_all_day_events: true,
+            consider_pending_meetings_busy: true,
+            room_picker_fn: Box::new(|_| vec![]),
+            reject_date_fn: Box::new(gen::default_reject_date),
+            reject_datetime_fn: Box::new(gen::default_reject_datetime),
+        }
+    }
+}
+
+// Compute the score for a slot given list of attendees and their availability
+// Can be better
+fn compute_score(start: &chrono::DateTime<chrono::Utc>,
+                 end: &chrono::DateTime<chrono::Utc>,
+                 attendees: &Vec<String>,
+                 availability: &HashMap<String, MeetingsTree>
+) -> usize {
+    let mut score = 1;
+
+    // TODO Need to add score based on start of the range
+    for a in attendees.iter() {
+        // Get all the meetings in the two hour range. Each of them is worth 20
+        score += availability[a].find(*start-chrono::Duration::hours(2)..*end+chrono::Duration::hours(2)).count() * 20;
+        // Get all the meetings in the 1 hour range. Each of them is worth 100
+        score += availability[a].find(*start-chrono::Duration::hours(1)..*end+chrono::Duration::hours(1)).count() * 100;
+        // Get all the meetings in the 30 min range. Each of them is worth 300
+        score += availability[a].find(*start-chrono::Duration::minutes(30)..*end+chrono::Duration::minutes(30)).count() * 300;
+        // Get all the meetings in the 15 min range. Each of them is worth 600
+        score += availability[a].find(*start-chrono::Duration::minutes(15)..*end+chrono::Duration::minutes(15)).count() * 600;
+    }
+    score
+}
+
 
 // The input to the program containing what meetings the user
 // wants to schedule
@@ -95,6 +188,14 @@ impl Config {
     pub fn from_yaml_str(s: &str) -> Config{
         let docs = yaml_rust::YamlLoader::load_from_str(s).unwrap();
         Config::from_yaml(&docs[0])
+    }
+
+    pub fn room_picker(&self, size: usize) -> Vec<String> {
+        if size <= 2 {
+            self.small_rooms.iter().map(|k| k.email.to_string()).collect()
+        } else {
+            self.large_rooms.iter().map(|k| k.email.to_string()).collect()
+        }
     }
 
     pub fn from_file(file: &str) -> Config {
