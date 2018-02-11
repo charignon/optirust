@@ -15,20 +15,23 @@ fn generate_meetings_for_date(
     reject_datetime_fn: &Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>
 ) -> Vec<Meeting> {
 
+    let mut counter = 0;
     let mut res:Vec<Meeting> = Vec::new();
     let mut t = date.and_time(mint).unwrap();
     loop {
+        let ident = format!("{}_{}", id, counter);
         let start = t;
         let end = t + duration;
         if end.time() > maxt {
             break
         }
         t = t + step;
+        counter += 1;
         if reject_datetime_fn(start, end) {
             continue
         }
         res.push(Meeting{
-            id: id.clone(),
+            id: ident,
             start: start.with_timezone(&chrono::Utc),
             end: end.with_timezone(&chrono::Utc),
         })
