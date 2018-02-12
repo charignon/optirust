@@ -1,4 +1,5 @@
-use types::{DesiredMeeting, Input, MeetingCandidate};
+use types::{DesiredMeeting, Input, MeetingCandidate, MeetingsTree};
+use std::collections::HashMap;
 use chrono;
 
 #[allow(dead_code)]
@@ -41,6 +42,21 @@ meetings:
     min_date: 2018-02-08 11:00:00
     max_date: 2018-02-10 16:00:00
 ".to_string()
+}
+
+#[allow(dead_code)]
+pub fn fetch_results(emails: Vec<String>) -> HashMap<String, MeetingsTree> {
+    let mut l = HashMap::new();
+    for i in emails.into_iter() {
+        let mut k = MeetingsTree::new();
+        if i == "laurent.charignon@foo.com" {
+            let from = "2018-02-08T14:00:00-08:00".parse::<chrono::DateTime<chrono::Utc>>().expect("Error from");
+            let to = "2018-02-08T14:45:00-08:00".parse::<chrono::DateTime<chrono::Utc>>().expect("error to");
+            k.insert(from..to, "meeting".to_string())
+        }
+        l.insert(i, k);
+    }
+    l
 }
 
 #[allow(dead_code)]

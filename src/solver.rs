@@ -119,6 +119,39 @@ fn build_intersections_pairs(
     intersections
 }
 
+#[test]
+fn test_new_from_desired_meetings_and_opts() {
+    // Create options and fake fetcher
+    // Create a desired meetings
+    let desired_meetings = fixtures::test_desired_meetings();
+    let options =  Options{
+        room_picker_fn: Box::new(|_| vec!["room@bar.html".to_string()]),
+        fetch_fn: Box::new(|emails| fixtures::fetch_results(emails)),
+        ..Default::default()
+    };
+    let k = SolverInput::new_from_desired_meetings_and_opts(desired_meetings.clone(), &options);
+    // The fetch fn we use returns one meeting for laurent.charignon@foo.com
+    // that is taking place from 2018-02-08 14:00:00 to 2018-02-08 14:45:00
+    // the desired meetings of the solver input should be the same as the one we passed in
+    assert_eq!(k.desired_meetings, desired_meetings);
+
+    // The canidates map should contain 124 candidates
+    // The first meeting has one has 8 days from 10 to 6, that's 110 meetings
+    // => 7 hour bookable per day, 2 meetings per hour, so 14 meetings per day x 8 = 112
+    // - the one scheduled meeting spanning across two slots = 110
+    // The second one has 2 days from 11 to 4, that's 14 meetings
+    // => 4 hour bookable per day, 2 meetings per hour, so 8 meetings per day x 2 = 16
+    // - the one scheduled meeting spanning across two slots = 14
+
+    assert_eq!(k.candidate_per_desired_meeting["title"].len(), 110);
+    assert_eq!(k.candidate_per_desired_meeting["title2"].len(), 14);
+    assert_eq!(k.candidates.len(), 124);
+    // 16 intersections because only the first two days overlap
+    assert_eq!(k.intersections.len(), 14);
+}
+
+
+
 impl SolverInput {
     pub fn new() -> SolverInput {
         SolverInput {
