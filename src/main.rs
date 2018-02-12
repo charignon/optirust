@@ -16,13 +16,13 @@ extern crate chrono;
 extern crate chrono_tz;
 #[macro_use]
 extern crate clap;
-extern crate serde_yaml;
-extern crate yaml_rust;
 extern crate google_calendar3 as calendar3;
-extern crate yup_oauth2 as oauth2;
 extern crate hyper;
 extern crate hyper_rustls;
 extern crate rayon;
+extern crate serde_yaml;
+extern crate yaml_rust;
+extern crate yup_oauth2 as oauth2;
 use std::collections::HashMap;
 use std::process;
 
@@ -33,32 +33,40 @@ mod gen;
 mod solver;
 mod types;
 
-use types::{Input, Config, Solution};
+use types::{Config, Input, Solution};
 
 fn main() {
     let matches = app::build_app().get_matches();
     let options = {
         let config = Config::from_file(
-            matches.value_of("config").expect("Please give a valid config file")
+            matches
+                .value_of("config")
+                .expect("Please give a valid config file"),
         );
-        types::Options{
+        types::Options {
             room_picker_fn: Box::new(move |k| config.room_picker(k)),
             ..Default::default()
         }
     };
 
     let input = Input::from_file(
-        matches.value_of("input").expect("Please give a valid input file")
+        matches
+            .value_of("input")
+            .expect("Please give a valid input file"),
     );
 
-    let solver_input = solver::SolverInput::new_from_desired_meetings_and_opts(
-        input.meetings,
-        &options
-    );
+    let solver_input =
+        solver::SolverInput::new_from_desired_meetings_and_opts(input.meetings, &options);
 
     let sol = match (options.solver_fn)(&solver_input) {
-        Some(m) => Solution{solved: true, candidates: m},
-        None => Solution{solved: false, candidates: HashMap::new()}
+        Some(m) => Solution {
+            solved: true,
+            candidates: m,
+        },
+        None => Solution {
+            solved: false,
+            candidates: HashMap::new(),
+        },
     };
 
     if !sol.solved {
@@ -75,4 +83,3 @@ fn main() {
         }
     }
 }
-

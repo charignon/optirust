@@ -9,10 +9,8 @@ use chrono::prelude::*;
 use fixtures;
 use gen;
 use bio::data_structures::interval_tree::IntervalTree;
-use types::{DesiredMeeting, MeetingsTree,
-            MeetingCandidate, Meeting,
-            RoomPickerFnType, ScoringFnType, Options};
-
+use types::{DesiredMeeting, Meeting, MeetingCandidate, MeetingsTree, Options, RoomPickerFnType,
+            ScoringFnType};
 
 #[derive(Debug)]
 pub struct SolverInput {
@@ -24,7 +22,9 @@ pub struct SolverInput {
 
 pub fn solve_with_cbc_solver(s: &SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>> {
     let mut buffer = File::create("temp.lp").unwrap();
-    buffer.write_all(s.to_lp_fmt().as_bytes()).expect("Cannot write to disk!");
+    buffer
+        .write_all(s.to_lp_fmt().as_bytes())
+        .expect("Cannot write to disk!");
 
     Command::new("cbc")
         .args(&["temp.lp", "solve", "solution", "solution.sol"])
@@ -33,18 +33,21 @@ pub fn solve_with_cbc_solver(s: &SolverInput) -> Option<HashMap<DesiredMeeting, 
 
     let mut input = File::open("solution.sol").expect("file not found");
     let mut contents = String::new();
-    input.read_to_string(&mut contents)
+    input
+        .read_to_string(&mut contents)
         .expect("something went wrong reading the file");
 
     read_cbc_solver_solution(&contents, s)
 }
 
 // Extract the list of attendees emails from the input and config
-fn extract_attendees(i: &[DesiredMeeting], c: &RoomPickerFnType) -> Vec<String>
-{
+fn extract_attendees(i: &[DesiredMeeting], c: &RoomPickerFnType) -> Vec<String> {
     let mut s: HashSet<String> = HashSet::new();
     for m in i {
-        let attendees = m.attendees.iter().map(|k| k.to_string()).collect::<Vec<String>>();
+        let attendees = m.attendees
+            .iter()
+            .map(|k| k.to_string())
+            .collect::<Vec<String>>();
         s.extend(c(attendees.len()));
         s.extend(attendees);
     }
@@ -58,13 +61,11 @@ fn generate_meeting_candidate(
     ident: String,
     room_picker: &RoomPickerFnType,
     scoring_fn: &ScoringFnType,
-    i: &Meeting
-) -> Option<MeetingCandidate>
-{
-
-    let possible_rooms:Vec<String> = room_picker(tm.attendees.len());
+    i: &Meeting,
+) -> Option<MeetingCandidate> {
+    let possible_rooms: Vec<String> = room_picker(tm.attendees.len());
     let mandatory_attendees = &tm.attendees;
-    let conflicts:usize = mandatory_attendees
+    let conflicts: usize = mandatory_attendees
         .iter()
         .map(|k| avail[k].find(i.start..i.end).count())
         .sum();
@@ -74,7 +75,7 @@ fn generate_meeting_candidate(
     }
 
     // What is a suitable room?
-    let mut suitable_room:Option<String> = None;
+    let mut suitable_room: Option<String> = None;
     for r in &possible_rooms {
         if avail[r].find(i.start..i.end).count() == 0 {
             suitable_room = Some(r.to_string());
@@ -83,20 +84,20 @@ fn generate_meeting_candidate(
     }
 
     // Create a suitable candidate
-    Some(MeetingCandidate{
+    Some(MeetingCandidate {
         title: tm.title.to_string(),
         id: ident,
         start: i.start,
         end: i.end,
         room: suitable_room?,
-        score: scoring_fn(&i.start, &i.end, mandatory_attendees, avail)
+        score: scoring_fn(&i.start, &i.end, mandatory_attendees, avail),
     })
 }
 
 fn build_intersections_pairs(
     candidates: &HashMap<String, MeetingCandidate>,
 ) -> HashSet<Vec<String>> {
-    let mut tree:IntervalTree<DateTime<chrono::Utc>, String> = IntervalTree::new();
+    let mut tree: IntervalTree<DateTime<chrono::Utc>, String> = IntervalTree::new();
     for it in candidates {
         let c = it.1;
         tree.insert(c.start..c.end, c.id.to_string());
@@ -120,9 +121,9 @@ fn test_new_from_desired_meetings_and_opts() {
     // Create options and fake fetcher
     // Create a desired meetings
     let desired_meetings = fixtures::test_desired_meetings();
-    let options =  Options{
+    let options = Options {
         room_picker_fn: Box::new(|_| vec!["room@bar.html".to_string()]),
-        fetch_fn: Box::new(|emails,_,_| fixtures::fetch_results(emails)),
+        fetch_fn: Box::new(|emails, _, _| fixtures::fetch_results(emails)),
         ..Default::default()
     };
     let k = SolverInput::new_from_desired_meetings_and_opts(desired_meetings.clone(), &options);
@@ -146,8 +147,6 @@ fn test_new_from_desired_meetings_and_opts() {
     assert_eq!(k.intersections.len(), 14);
 }
 
-
-
 impl SolverInput {
     pub fn new() -> SolverInput {
         SolverInput {
@@ -158,24 +157,35 @@ impl SolverInput {
         }
     }
 
-    pub fn new_from_desired_meetings_and_opts(desired_meetings: Vec<DesiredMeeting>,
-                                              opts: &Options) -> SolverInput {
+    pub fn new_from_desired_meetings_and_opts(
+        desired_meetings: Vec<DesiredMeeting>,
+        opts: &Options,
+    ) -> SolverInput {
         let mut solver_input = SolverInput::new();
         solver_input.desired_meetings = desired_meetings.clone();
         let emails = extract_attendees(&desired_meetings, &opts.room_picker_fn);
-        let avail:HashMap<String, MeetingsTree> = (opts.fetch_fn)(
+        let avail: HashMap<String, MeetingsTree> = (opts.fetch_fn)(
             emails,
             opts.ignore_all_day_events,
             opts.ignore_meetings_with_no_response,
         );
         for me in desired_meetings {
-            for interval in gen::generate_all_possible_meetings(&me, &*opts.reject_date_fn, &*opts.reject_datetime_fn) {
-                if let Some(m) = generate_meeting_candidate(&me, &avail, interval.id.to_string(), &opts.room_picker_fn, &opts.scoring_fn, &interval) {
+            for interval in gen::generate_all_possible_meetings(
+                &me,
+                &*opts.reject_date_fn,
+                &*opts.reject_datetime_fn,
+            ) {
+                if let Some(m) = generate_meeting_candidate(
+                    &me,
+                    &avail,
+                    interval.id.to_string(),
+                    &opts.room_picker_fn,
+                    &opts.scoring_fn,
+                    &interval,
+                ) {
+                    solver_input.candidates.insert(interval.id.to_string(), m);
                     solver_input
-                        .candidates
-                        .insert(interval.id.to_string(), m);
-                    solver_input.
-                        candidate_per_desired_meeting
+                        .candidate_per_desired_meeting
                         .entry(me.title.to_string())
                         .or_insert_with(Vec::new)
                         .push(interval.id.to_string());
@@ -186,12 +196,11 @@ impl SolverInput {
         solver_input
     }
 
-
     fn to_lp_fmt(&self) -> String {
         let objective_string = format!("  obj: {}", {
             let mut k = self.candidates
                 .iter()
-                .map(|it| format!("{} {}", it.1.score, it.0 ))
+                .map(|it| format!("{} {}", it.1.score, it.0))
                 .collect::<Vec<String>>();
             k.sort();
             k.join(" + ")
@@ -214,7 +223,7 @@ impl SolverInput {
         let variables_string = {
             let mut k = self.candidates
                 .iter()
-                .map(|it| format!("{}", it.0 ))
+                .map(|it| format!("{}", it.0))
                 .collect::<Vec<String>>();
             k.sort();
             format!("  {}", k.join(" "))
@@ -223,10 +232,11 @@ impl SolverInput {
         constraints.extend(intersection_constraints);
         constraints.sort();
 
-        format!("Maximize\n{}\nSubject To\n{}\nBinary\n{}\nEnd",
-                objective_string,
-                constraints.join("\n"),
-                variables_string
+        format!(
+            "Maximize\n{}\nSubject To\n{}\nBinary\n{}\nEnd",
+            objective_string,
+            constraints.join("\n"),
+            variables_string
         )
     }
 }
@@ -234,15 +244,23 @@ impl SolverInput {
 #[test]
 fn test_to_lp_fmt() {
     let mut input = SolverInput::new();
-    let candidate_a =  fixtures::sample_candidate_a();
-    let candidate_b =  fixtures::sample_candidate_b();
-    let desired_meetings = fixtures::test_desired_meetings() ;
+    let candidate_a = fixtures::sample_candidate_a();
+    let candidate_b = fixtures::sample_candidate_b();
+    let desired_meetings = fixtures::test_desired_meetings();
 
-    input.candidates.insert("id10873".to_string(), candidate_a.clone());
-    input.candidates.insert("id0".to_string(), candidate_b.clone());
+    input
+        .candidates
+        .insert("id10873".to_string(), candidate_a.clone());
+    input
+        .candidates
+        .insert("id0".to_string(), candidate_b.clone());
     input.desired_meetings.extend(desired_meetings.clone());
-    input.candidate_per_desired_meeting.insert("title".to_string(), vec!["id10873".to_string()]);
-    input.candidate_per_desired_meeting.insert("title2".to_string(), vec!["id0".to_string()]);
+    input
+        .candidate_per_desired_meeting
+        .insert("title".to_string(), vec!["id10873".to_string()]);
+    input
+        .candidate_per_desired_meeting
+        .insert("title2".to_string(), vec!["id0".to_string()]);
 
     assert_eq!(
         "Maximize
@@ -255,31 +273,36 @@ Binary
 End",
         input.to_lp_fmt()
     );
-
 }
 
 fn read_cbc_solver_solution(
     solution: &str,
     solver_input: &SolverInput,
 ) -> Option<HashMap<DesiredMeeting, MeetingCandidate>> {
-
     let mut lines = solution.lines();
     let first_line = lines.next().unwrap();
     if !first_line.contains("Optimal") {
         return None;
     }
-    let k:f32 = first_line.split_whitespace().collect::<Vec<&str>>().last().unwrap().parse().unwrap();
-    let score = - k;
+    let k: f32 = first_line
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .last()
+        .unwrap()
+        .parse()
+        .unwrap();
+    let score = -k;
     println!("Total score is {}", score);
 
     let mut res: HashMap<DesiredMeeting, MeetingCandidate> = HashMap::new();
     for l in lines {
-        let words:Vec<&str> = l.split_whitespace().collect();
+        let words: Vec<&str> = l.split_whitespace().collect();
         let ident = words[1];
         let val = words[2];
         if val == "1" {
             let candidate = &solver_input.candidates[ident];
-            let desired_meeting = solver_input.desired_meetings
+            let desired_meeting = solver_input
+                .desired_meetings
                 .iter()
                 .find(|k| k.title == candidate.title)
                 .unwrap();
@@ -293,12 +316,16 @@ fn read_cbc_solver_solution(
 #[test]
 fn test_read_cbc_solver_solution_with_good_solver_input() {
     let mut input = SolverInput::new();
-    let candidate_a =  fixtures::sample_candidate_a();
-    let candidate_b =  fixtures::sample_candidate_b();
-    let desired_meetings = fixtures::test_desired_meetings() ;
+    let candidate_a = fixtures::sample_candidate_a();
+    let candidate_b = fixtures::sample_candidate_b();
+    let desired_meetings = fixtures::test_desired_meetings();
 
-    input.candidates.insert("id10873".to_string(), candidate_a.clone());
-    input.candidates.insert("id0".to_string(), candidate_b.clone());
+    input
+        .candidates
+        .insert("id10873".to_string(), candidate_a.clone());
+    input
+        .candidates
+        .insert("id0".to_string(), candidate_b.clone());
     input.desired_meetings.extend(desired_meetings.clone());
 
     let mut expected_output = HashMap::new();
@@ -310,4 +337,3 @@ fn test_read_cbc_solver_solution_with_good_solver_input() {
         read_cbc_solver_solution(&fixtures::sample_cbc_solution(), &input)
     );
 }
-
