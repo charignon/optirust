@@ -2,12 +2,14 @@
 
 Optimized meeting scheduling with Google Calendar API
 
-## How to use
+## Installation
 
 - Install rust with rustup
 - Download or build the cbc solver (you can use the one from https://github.com/coin-or/pulp)
 - Clone this repo.
-- Generate credential for the google calendar api, put them in =client_secret.json= (https://docs.google.com/presentation/d/16VBTYIqoqWAeS0PW6rmPSHqyaZk5cPCo1ABByqvClSg/edit?usp=sharing)
+- Generate credential for the google calendar api, put them in `client_secret.json` (https://docs.google.com/presentation/d/16VBTYIqoqWAeS0PW6rmPSHqyaZk5cPCo1ABByqvClSg/edit?usp=sharing)
+
+## Usage
 - Write a config file with email address for rooms you want to book (small is 1-2 people, large is 3+):
 ```yaml
 rooms:
@@ -21,7 +23,7 @@ rooms:
       email: bozorg@jam.com
 ```
 
-- Write an input file with the meeting you want to book:
+- Write an input file with the meetings you would like to book:
 ```yaml
 meetings:
   - title: title
