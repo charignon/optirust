@@ -2,14 +2,12 @@
 
 - TODO Use serde
 - TODO Better testing for generate_solution!
-- TODO Flag to ignore the non accepted meeting
 - TODO Make it possible to accept day long event
 - TODO Make sure the code works when no room specified
 
-- TODO Make the input parsing a desired meeting parsing and remove one type
+- TODO Make the input parsing return a vector of desired meetingd
 - TODO Make constraints configurable using a config file
 - TODO Add example files in a separate folder
-- TODO Explain better how to use the program
 - TODO Test usability on a new host
 - TODO Log level
 */

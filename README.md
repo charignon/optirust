@@ -1,13 +1,13 @@
-# optirust
+# Optirust
 
 Optimized meeting scheduling with Google Calendar API
 
 ## How to use
 
 - Install rust with rustup
-- Download or build the cbc solver.
+- Download or build the cbc solver (you can use the one from https://github.com/coin-or/pulp)
 - Clone this repo.
-- Generate credential for the google calendar api, put them in =client_secret.json=.
+- Generate credential for the google calendar api, put them in =client_secret.json= (https://docs.google.com/presentation/d/16VBTYIqoqWAeS0PW6rmPSHqyaZk5cPCo1ABByqvClSg/edit?usp=sharing)
 - Write a config file with email address for rooms you want to book (small is 1-2 people, large is 3+):
 ```yaml
 rooms:
@@ -38,5 +38,5 @@ meetings:
     max_date: 2030-02-20 18:00:00
 ```
 
-- Run the code in dry run mode, make sure that it works: `cargo run -- --input input --config config`
+- Run the code in dry run mode: `cargo run -- --input input --config config` (it will print the meeting that would be booked if you ran it with the `--book` flag)
 - Book the meetings for real: `cargo run -- --book --input input --config config`
