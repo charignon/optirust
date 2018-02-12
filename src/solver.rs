@@ -126,7 +126,7 @@ fn test_new_from_desired_meetings_and_opts() {
     let desired_meetings = fixtures::test_desired_meetings();
     let options =  Options{
         room_picker_fn: Box::new(|_| vec!["room@bar.html".to_string()]),
-        fetch_fn: Box::new(|emails| fixtures::fetch_results(emails)),
+        fetch_fn: Box::new(|emails,_,_| fixtures::fetch_results(emails)),
         ..Default::default()
     };
     let k = SolverInput::new_from_desired_meetings_and_opts(desired_meetings.clone(), &options);
@@ -162,12 +162,16 @@ impl SolverInput {
         }
     }
 
-    // TODO Test this
     pub fn new_from_desired_meetings_and_opts(desired_meetings: Vec<DesiredMeeting>,
                                               opts: &Options) -> SolverInput {
         let mut solver_input = SolverInput::new();
         solver_input.desired_meetings = desired_meetings.clone();
-        let avail:HashMap<String, MeetingsTree> = (opts.fetch_fn)(extract_attendees(&desired_meetings, &opts.room_picker_fn));
+        let emails = extract_attendees(&desired_meetings, &opts.room_picker_fn);
+        let avail:HashMap<String, MeetingsTree> = (opts.fetch_fn)(
+            emails,
+            opts.ignore_all_day_events,
+            opts.ignore_meetings_with_no_response,
+        );
         for me in desired_meetings {
             for interval in gen::generate_all_possible_meetings(&me, &opts.reject_date_fn, &opts.reject_datetime_fn) {
                 if let Some(m) = generate_meeting_candidate(&me, &avail, interval.id.to_string(), &opts.room_picker_fn, &opts.scoring_fn, &interval) {

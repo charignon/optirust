@@ -78,8 +78,44 @@ pub fn get_calendar_hub() -> CalendarHubType {
     CalendarHub::new(client, authenticator)
 }
 
-fn valid_api_meeting(l: calendar3::Event) -> bool{
-    !l.start.unwrap().date_time.is_none() && !l.end.unwrap().date_time.is_none()
+fn valid_api_meeting(
+    person: &str,
+    l: calendar3::Event,
+    _ignore_all_day_events: bool,
+    ignore_meetings_with_no_response: bool
+) -> bool {
+    let has_bound = !l.start.unwrap().date_time.is_none() && !l.end.unwrap().date_time.is_none();
+    let attendees:Vec<calendar3::EventAttendee> = l.attendees.unwrap();
+    // TODO Make that more idiomatic
+    // "accepted" or "tentative"
+    let attendees_status:Vec<String> = attendees
+        .into_iter()
+        .filter(|k| k.email.clone().unwrap_or("XXX".to_string()) == person)
+        .map(|l| l.response_status.unwrap())
+        .collect();
+    if attendees_status.len() != 1 {
+        return false
+    }
+    let status = &attendees_status[0];
+    //
+    // Expected behavior:
+    //
+    // ignore_meetings_with_no_response | status        | Valid?
+    //////////////////////////////////////////////////////////////
+    // true                             | tentative     | true
+    // true                             | accepted      | true
+    // true                             | declined      | false
+    // true                             | needsAction   | false
+    // false                            | tentative     | true
+    // false                            | accepted      | true
+    // false                            | declined      | true
+    // false                            | needsAction   | true
+
+    let has_no_response = !vec!["accepted".to_string(), "tentative".to_string()].contains(status);
+    if ignore_meetings_with_no_response && has_no_response {
+        return false
+    }
+    has_bound
 }
 
 
@@ -94,7 +130,12 @@ fn meetings_to_tree(meetings: Vec<Meeting>)
     intervals
 }
 
-fn fetch_one_availability_with_api(person: &str, hub: &CalendarHubType) -> MeetingsTree {
+fn fetch_one_availability_with_api(
+    person: &str,
+    hub: &CalendarHubType,
+    ignore_all_day_events: bool,
+    ignore_meetings_with_no_response: bool,
+) -> MeetingsTree {
     println!("Fetching for {:?}", person);
     let result = hub
         .events()
@@ -110,18 +151,31 @@ fn fetch_one_availability_with_api(person: &str, hub: &CalendarHubType) -> Meeti
     meetings_to_tree(
         events
             .into_iter()
-            .filter(|l| valid_api_meeting(l.clone()))
-            .map(|m| Meeting::from_api(m))
+            .filter(|l| valid_api_meeting(
+                person,
+                l.clone(),
+                ignore_all_day_events,
+                ignore_meetings_with_no_response)
+            ).map(|m| Meeting::from_api(m))
             .collect::<Vec<Meeting>>()
     )
 }
 
-pub fn fetch_availability_with_api(people: Vec<String>) -> HashMap<String, MeetingsTree> {
+pub fn fetch_availability_with_api(
+    people: Vec<String>,
+    ignore_all_day_events: bool,
+    ignore_meetings_with_no_response: bool,
+) -> HashMap<String, MeetingsTree> {
     let mut res: HashMap<String, IntervalTree<DateTime<chrono::Utc>, String>> = HashMap::new();
 
     let availability = people
         .par_iter()
-        .map(|a| fetch_one_availability_with_api(a, &get_calendar_hub()))
+        .map(|a| fetch_one_availability_with_api(
+            a,
+            &get_calendar_hub(),
+            ignore_all_day_events,
+            ignore_meetings_with_no_response,
+        ))
         .collect::<Vec<MeetingsTree>>()
         .into_iter();
 

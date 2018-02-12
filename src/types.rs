@@ -21,7 +21,7 @@ pub type RejectDateTimeFnType = Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz
 pub type RejectDateFnType = Box<Fn(chrono::Date<Tz>) -> bool>;
 pub type RoomPickerFnType = Box<Fn(usize) -> Vec<String>>;
 pub type SolverFnType = Box<Fn(&solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>>;
-pub type FetchFnType = Box<Fn(Vec<String>) -> HashMap<String, MeetingsTree>>;
+pub type FetchFnType = Box<Fn(Vec<String>, bool, bool) -> HashMap<String, MeetingsTree>>;
 
 // Options is a struct to represent all the tweakable part of the workflow
 // it can be used to modify the behavior of the whole program for example by
@@ -63,7 +63,7 @@ pub struct Options {
     // TODO Use
     // If true will consider pending meeting busy and not try to schedule over them
     // default: true
-    pub consider_pending_meetings_busy: bool,
+    pub ignore_meetings_with_no_response: bool,
 }
 
 impl Default for Options {
@@ -73,7 +73,7 @@ impl Default for Options {
             solver_fn: Box::new(solver::solve_with_cbc_solver),
             scoring_fn: Box::new(compute_score),
             ignore_all_day_events: true,
-            consider_pending_meetings_busy: true,
+            ignore_meetings_with_no_response: true,
             room_picker_fn: Box::new(|_| vec![]),
             reject_date_fn: Box::new(gen::default_reject_date),
             reject_datetime_fn: Box::new(gen::default_reject_datetime),
