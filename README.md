@@ -4,7 +4,7 @@ Optimized meeting scheduling with Google Calendar API
 
 ## Installation
 
-- Install rust with rustup
+- Install rust with rustup (https://www.rustup.rs/)
 - Download or build the cbc solver (you can use the one from https://github.com/coin-or/pulp)
 - Clone this repo.
 - Generate credential for the google calendar api, put them in `client_secret.json` (https://docs.google.com/presentation/d/16VBTYIqoqWAeS0PW6rmPSHqyaZk5cPCo1ABByqvClSg/edit?usp=sharing)
