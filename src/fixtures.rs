@@ -47,7 +47,7 @@ meetings:
 #[allow(dead_code)]
 pub fn fetch_results(emails: Vec<String>) -> HashMap<String, MeetingsTree> {
     let mut l = HashMap::new();
-    for i in emails.into_iter() {
+    for i in emails {
         let mut k = MeetingsTree::new();
         if i == "laurent.charignon@foo.com" {
             let from = "2018-02-08T14:00:00-08:00".parse::<chrono::DateTime<chrono::Utc>>().expect("Error from");
@@ -77,14 +77,14 @@ rooms:
 #[allow(dead_code)]
 pub fn test_desired_meetings() -> Vec<DesiredMeeting> {
     let a = Input::from_yaml_str(&test_input());
-    return a.meetings.clone();
+    a.meetings.clone()
 }
 
 
 #[allow(dead_code)]
 pub fn test_desired_meeting() -> DesiredMeeting {
     let a = Input::from_yaml_str(&test_input());
-    return a.meetings[1].clone();
+    a.meetings[1].clone()
 }
 
 #[allow(dead_code)]

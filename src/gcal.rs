@@ -54,7 +54,7 @@ pub fn book_with_api(s: &Solution) {
     let mut es:Vec<calendar3::Event> = Vec::new();
 
     for (desired_meeting, candidate) in &s.candidates {
-        es.push(candidate_and_meeting_to_event(&desired_meeting, &candidate));
+        es.push(candidate_and_meeting_to_event(desired_meeting, candidate));
     }
 
     es.par_iter()
@@ -64,7 +64,7 @@ pub fn book_with_api(s: &Solution) {
 
 // Return a CalendarHub object to work with the google calendar API
 pub fn get_calendar_hub() -> CalendarHubType {
-    let secret = read_client_secret(CLIENT_SECRET_FILE.to_string());
+    let secret = read_client_secret(CLIENT_SECRET_FILE);
     let client = hyper::Client::with_connector(
         HttpsConnector::new(hyper_rustls::TlsClient::new()));
     let authenticator = Authenticator::new(&secret,
@@ -90,7 +90,7 @@ fn valid_api_meeting(
     // "accepted" or "tentative"
     let attendees_status:Vec<String> = attendees
         .into_iter()
-        .filter(|k| k.email.clone().unwrap_or("XXX".to_string()) == person)
+        .filter(|k| k.email.clone().unwrap_or_else(|| "XXX".to_string()) == person)
         .map(|l| l.response_status.unwrap())
         .collect();
     if attendees_status.len() != 1 {
@@ -121,10 +121,10 @@ fn valid_api_meeting(
 
 // Convert a vector of meeting to an interval tree for ease of
 // intersection computation
-fn meetings_to_tree(meetings: Vec<Meeting>)
+fn meetings_to_tree(meetings: &[Meeting])
                         -> MeetingsTree {
     let mut intervals: MeetingsTree = IntervalTree::new();
-    for m in &meetings {
+    for m in meetings {
         intervals.insert(m.start..m.end, m.id.clone());
     }
     intervals
@@ -149,14 +149,14 @@ fn fetch_one_availability_with_api(
     let events:Vec<calendar3::Event> = events.items.unwrap();
 
     meetings_to_tree(
-        events
+        &events
             .into_iter()
             .filter(|l| valid_api_meeting(
                 person,
                 l.clone(),
                 ignore_all_day_events,
                 ignore_meetings_with_no_response)
-            ).map(|m| Meeting::from_api(m))
+            ).map(Meeting::from_api)
             .collect::<Vec<Meeting>>()
     )
 }
@@ -187,10 +187,10 @@ pub fn fetch_availability_with_api(
     res
 }
 
-const CLIENT_SECRET_FILE: &'static str = "client_secret.json";
+const CLIENT_SECRET_FILE: &str = "client_secret.json";
 
 // reads the JSON secret file
-fn read_client_secret(file: String) -> ApplicationSecret {
-    read_application_secret(Path::new(&file)).unwrap()
+fn read_client_secret(file: &str) -> ApplicationSecret {
+    read_application_secret(Path::new(file)).unwrap()
 }
 

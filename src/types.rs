@@ -16,7 +16,7 @@ use yaml_rust;
 use fixtures::{test_input, test_config, test_invalid_input};
 pub type ScoringFnType = Box<Fn(
     &chrono::DateTime<Utc>, &chrono::DateTime<Utc>,
-    &Vec<String>, &HashMap<String, MeetingsTree>) -> usize>;
+    &[String], &HashMap<String, MeetingsTree>) -> usize>;
 pub type RejectDateTimeFnType = Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>;
 pub type RejectDateFnType = Box<Fn(chrono::Date<Tz>) -> bool>;
 pub type RoomPickerFnType = Box<Fn(usize) -> Vec<String>>;
@@ -85,7 +85,7 @@ impl Default for Options {
 // Can be better
 fn compute_score(start: &chrono::DateTime<chrono::Utc>,
                  end: &chrono::DateTime<chrono::Utc>,
-                 attendees: &Vec<String>,
+                 attendees: &[String],
                  availability: &HashMap<String, MeetingsTree>
 ) -> usize {
     let mut score = 1;
@@ -233,7 +233,7 @@ pub struct MeetingCandidate {
 impl MeetingCandidate {
     #[allow(dead_code)]
     pub fn intersects(&self, o: &MeetingCandidate) -> bool {
-        return (self.start < o.end) && (o.start < self.end)
+        (self.start < o.end) && (o.start < self.end)
     }
 }
 
@@ -293,7 +293,7 @@ fn parse_list_of<T: YamlParsable>(s: &yaml_rust::Yaml) -> Vec<T> {
 
 impl YamlParsable for RoomConfig {
     fn from_yaml(s:&yaml_rust::Yaml) -> RoomConfig {
-        return RoomConfig{
+        RoomConfig{
             name: s["name"].as_str().unwrap().to_string(),
             email: s["email"].as_str().unwrap().to_string()
         }
@@ -302,7 +302,7 @@ impl YamlParsable for RoomConfig {
 
 impl YamlParsable for Config {
     fn from_yaml(s:&yaml_rust::Yaml) -> Config {
-        return Config {
+        Config {
             small_rooms: parse_list_of(&s["rooms"]["small"]),
             large_rooms: parse_list_of(&s["rooms"]["large"])
         }
@@ -335,7 +335,7 @@ impl YamlParsable for DesiredMeeting {
 
 impl YamlParsable for Input {
     fn from_yaml(s:&yaml_rust::Yaml) -> Input {
-        return Input {
+        Input {
             meetings: parse_list_of(&s["meetings"]),
         }
     }

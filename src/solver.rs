@@ -24,7 +24,7 @@ pub struct SolverInput {
 
 pub fn solve_with_cbc_solver(s: &SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>> {
     let mut buffer = File::create("temp.lp").unwrap();
-    buffer.write(s.to_lp_fmt().as_bytes()).expect("Cannot write to disk!");
+    buffer.write_all(s.to_lp_fmt().as_bytes()).expect("Cannot write to disk!");
 
     Command::new("cbc")
         .args(&["temp.lp", "solve", "solution", "solution.sol"])
@@ -36,11 +36,11 @@ pub fn solve_with_cbc_solver(s: &SolverInput) -> Option<HashMap<DesiredMeeting, 
     input.read_to_string(&mut contents)
         .expect("something went wrong reading the file");
 
-    read_cbc_solver_solution(&contents, &s)
+    read_cbc_solver_solution(&contents, s)
 }
 
 // Extract the list of attendees emails from the input and config
-fn extract_attendees(i: &Vec<DesiredMeeting>, c: &RoomPickerFnType) -> Vec<String>
+fn extract_attendees(i: &[DesiredMeeting], c: &RoomPickerFnType) -> Vec<String>
 {
     let mut s: HashSet<String> = HashSet::new();
     for m in i {
@@ -82,18 +82,14 @@ fn generate_meeting_candidate(
         }
     }
 
-    if suitable_room.is_none() {
-        return None;
-    }
-
     // Create a suitable candidate
     Some(MeetingCandidate{
         title: tm.title.to_string(),
         id: ident,
         start: i.start,
         end: i.end,
-        room: suitable_room.unwrap(),
-        score: scoring_fn(&i.start, &i.end, &mandatory_attendees, &avail)
+        room: suitable_room?,
+        score: scoring_fn(&i.start, &i.end, mandatory_attendees, avail)
     })
 }
 
@@ -108,9 +104,9 @@ fn build_intersections_pairs(
 
     let mut intersections: HashSet<Vec<String>> = HashSet::new();
     for c in candidates {
-        let ref ident = c.0;
+        let ident = c.0;
         let range = c.1.start..c.1.end;
-        for k in tree.find(range).map(|r| r.data()).filter(|k| k != ident) {
+        for k in tree.find(range).map(|r| r.data()).filter(|k| k != &ident) {
             let mut combined = vec![k.to_string(), ident.to_string()];
             combined.sort();
             intersections.insert(combined);
@@ -173,7 +169,7 @@ impl SolverInput {
             opts.ignore_meetings_with_no_response,
         );
         for me in desired_meetings {
-            for interval in gen::generate_all_possible_meetings(&me, &opts.reject_date_fn, &opts.reject_datetime_fn) {
+            for interval in gen::generate_all_possible_meetings(&me, &*opts.reject_date_fn, &*opts.reject_datetime_fn) {
                 if let Some(m) = generate_meeting_candidate(&me, &avail, interval.id.to_string(), &opts.room_picker_fn, &opts.scoring_fn, &interval) {
                     solver_input
                         .candidates
@@ -181,7 +177,7 @@ impl SolverInput {
                     solver_input.
                         candidate_per_desired_meeting
                         .entry(me.title.to_string())
-                        .or_insert(Vec::new())
+                        .or_insert_with(Vec::new)
                         .push(interval.id.to_string());
                 }
             }
@@ -282,7 +278,7 @@ fn read_cbc_solver_solution(
         let ident = words[1];
         let val = words[2];
         if val == "1" {
-            let candidate = solver_input.candidates.get(ident).unwrap();
+            let candidate = &solver_input.candidates[ident];
             let desired_meeting = solver_input.desired_meetings
                 .iter()
                 .find(|k| k.title == candidate.title)
@@ -291,7 +287,7 @@ fn read_cbc_solver_solution(
             res.insert(desired_meeting.clone(), candidate.clone());
         }
     }
-    return Some(res);
+    Some(res)
 }
 
 #[test]
