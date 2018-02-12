@@ -57,13 +57,12 @@ pub struct Options {
     // Default: score is high for clustered meetings (to avoid fragmentation)
     pub scoring_fn: ScoringFnType,
 
-    // TODO Use this, currently unused
     // If true will ignore all day events when scheduling
-    // Default: true, we ignore all day events
+    // Default: true, we ignore all day events (false isn't supported, TODO to implement)
     pub ignore_all_day_events: bool,
 
-    // TODO Use
-    // If true will consider pending meeting busy and not try to schedule over them
+    // If true will ignore meetings with no response and
+    // try to schedule over them
     // default: true
     pub ignore_meetings_with_no_response: bool,
 }
