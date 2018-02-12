@@ -10,6 +10,7 @@ use chrono::prelude::*;
 use chrono;
 use gcal;
 use gen;
+use serde_yaml;
 use solver;
 use chrono_tz::Tz;
 use yaml_rust;
@@ -191,28 +192,22 @@ impl Hash for DesiredMeeting {
 // The config file format describes the small and large
 // rooms available to book, small means 2 people or less
 // large 3+ people
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
-    pub small_rooms: Vec<RoomConfig>,
-    pub large_rooms: Vec<RoomConfig>,
+    pub small_rooms: Vec<String>,
+    pub large_rooms: Vec<String>,
 }
 
 impl Config {
     pub fn from_yaml_str(s: &str) -> Config {
-        let docs = yaml_rust::YamlLoader::load_from_str(s).unwrap();
-        Config::from_yaml(&docs[0])
+        serde_yaml::from_str(&s).unwrap()
     }
 
     pub fn room_picker(&self, size: usize) -> Vec<String> {
         if size <= 2 {
-            self.small_rooms
-                .iter()
-                .map(|k| k.email.to_string())
-                .collect()
+            self.small_rooms.clone()
         } else {
-            self.large_rooms
-                .iter()
-                .map(|k| k.email.to_string())
-                .collect()
+            self.large_rooms.clone()
         }
     }
 
@@ -228,14 +223,7 @@ impl Config {
 #[test]
 fn can_build_config() {
     let a = Config::from_yaml_str(&test_config());
-    assert_eq!(a.small_rooms[0].name, "Foo");
-    assert_eq!(a.large_rooms[0].email, "bozorg@jam.com")
-}
-
-#[allow(dead_code)]
-pub struct RoomConfig {
-    pub name: String,
-    pub email: String,
+    assert_eq!(a.large_rooms[0], "bozorg@jam.com")
 }
 
 // A potential meeting, linked to a desired meeting
@@ -311,24 +299,6 @@ fn parse_list_of<T: YamlParsable>(s: &yaml_rust::Yaml) -> Vec<T> {
         .into_iter()
         .map(|x| T::from_yaml(x))
         .collect()
-}
-
-impl YamlParsable for RoomConfig {
-    fn from_yaml(s: &yaml_rust::Yaml) -> RoomConfig {
-        RoomConfig {
-            name: s["name"].as_str().unwrap().to_string(),
-            email: s["email"].as_str().unwrap().to_string(),
-        }
-    }
-}
-
-impl YamlParsable for Config {
-    fn from_yaml(s: &yaml_rust::Yaml) -> Config {
-        Config {
-            small_rooms: parse_list_of(&s["rooms"]["small"]),
-            large_rooms: parse_list_of(&s["rooms"]["large"]),
-        }
-    }
 }
 
 impl YamlParsable for DesiredMeeting {

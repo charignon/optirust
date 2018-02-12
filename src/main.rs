@@ -20,9 +20,12 @@ extern crate google_calendar3 as calendar3;
 extern crate hyper;
 extern crate hyper_rustls;
 extern crate rayon;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_yaml;
 extern crate yaml_rust;
 extern crate yup_oauth2 as oauth2;
+
 use std::collections::HashMap;
 use std::process;
 

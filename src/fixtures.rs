@@ -68,15 +68,11 @@ pub fn fetch_results(emails: Vec<String>) -> HashMap<String, MeetingsTree> {
 #[allow(dead_code)]
 pub fn test_config() -> String {
     "
-rooms:
-  small:
-    - name: Foo
-      email: foo@bar.com
-    - name: Bar
-      email: joe@baz.com
-  large:
-    - name: Bozorg
-      email: bozorg@jam.com
+small_rooms:
+  - foo@bar.com
+  - joe@baz.com
+large_rooms:
+  - bozorg@jam.com
 "
         .to_string()
 }

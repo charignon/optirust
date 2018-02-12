@@ -12,15 +12,11 @@ Optimized meeting scheduling with Google Calendar API
 ## Usage
 - Write a config file with email address for rooms you want to book (small is 1-2 people, large is 3+):
 ```yaml
-rooms:
-  small:
-    - name: Foo
-      email: foo@bar.com
-    - name: Bar
-      email: joe@baz.com
-  large:
-    - name: Bozorg
-      email: bozorg@jam.com
+small_rooms:
+  - foo@bar.com
+  - joe@baz.com
+large_rooms:
+  - bozorg@jam.com
 ```
 
 - Write an input file with the meetings you would like to book:
