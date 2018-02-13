@@ -14,7 +14,6 @@ use serde_yaml;
 use solver;
 use chrono_tz::Tz;
 use std::fmt;
-use yaml_rust;
 use fixtures::{test_config, test_input, test_invalid_input};
 pub type ScoringFnType = Box<
     Fn(&chrono::DateTime<Utc>, &chrono::DateTime<Utc>, &[String], &HashMap<String, MeetingsTree>)
@@ -116,22 +115,6 @@ fn compute_score(
     score
 }
 
-// TODO Remove all this and use serde_yaml properly
-// We use YAML for all the format, each of the pub struct can implement the
-// YamlParsable trait for easy deserialization
-pub trait YamlParsable {
-    // Given a Yaml mapping to a pub struct, parses and return an instance of it
-    fn from_yaml(s: &yaml_rust::Yaml) -> Self;
-}
-
-fn parse_list_of<T: YamlParsable>(s: &yaml_rust::Yaml) -> Vec<T> {
-    s.as_vec()
-        .unwrap()
-        .into_iter()
-        .map(|x| T::from_yaml(x))
-        .collect()
-}
-// The config file format describes the small and large
 // rooms available to book, small means 2 people or less
 // large 3+ people
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -215,18 +198,6 @@ pub struct Meeting {
     pub end: DateTime<chrono::Utc>,
 }
 
-impl YamlParsable for Meeting {
-    fn from_yaml(s: &yaml_rust::Yaml) -> Meeting {
-        let start_time = s["start"]["dateTime"].as_str().unwrap();
-        let end_time = s["end"]["dateTime"].as_str().unwrap();
-
-        Meeting {
-            id: s["id"].as_str().unwrap().to_string(),
-            start: start_time.parse::<DateTime<Utc>>().unwrap(),
-            end: end_time.parse::<DateTime<Utc>>().unwrap(),
-        }
-    }
-}
 pub type MeetingsTree = IntervalTree<DateTime<chrono::Utc>, String>;
 
 pub struct Solution {
@@ -234,53 +205,22 @@ pub struct Solution {
     pub candidates: HashMap<DesiredMeeting, MeetingCandidate>,
 }
 
-// The input to the program containing what meetings the user
-// wants to schedule
-pub struct Input {
-    pub meetings: Vec<DesiredMeeting>,
-}
-
-impl Input {
-    pub fn from_yaml_str(s: &str) -> Input {
-        let docs = yaml_rust::YamlLoader::load_from_str(s).unwrap();
-        let input = Input::from_yaml(&docs[0]);
-        input.panic_if_invalid();
-        input
-    }
-
-    pub fn from_file(file: &str) -> Input {
-        let mut input = File::open(file).expect("file not found");
-        let mut contents = String::new();
-        input
-            .read_to_string(&mut contents)
-            .expect("something went wrong reading the file");
-        Input::from_yaml_str(&contents)
-    }
-
-    fn panic_if_invalid(&self) {
-        let all_titles = self.meetings
-            .iter()
-            .map(|k| k.title.to_string())
-            .collect::<Vec<String>>();
-        let all_titles_count = all_titles.len();
-        let titles_set: HashSet<String> = HashSet::from_iter(all_titles.into_iter());
-        if titles_set.len() != all_titles_count {
-            panic!("Two meetings cannot have the same title");
-        }
-    }
-}
-
-impl YamlParsable for Input {
-    fn from_yaml(s: &yaml_rust::Yaml) -> Input {
-        Input {
-            meetings: parse_list_of(&s["meetings"]),
-        }
-    }
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct InputDesiredMeeting {
+    title: String,
+    description: String,
+    attendees: Vec<String>,
+    min_date: chrono::NaiveDateTime,
+    max_date: chrono::NaiveDateTime,
+    step: Option<i64>,
+    duration: Option<i64>,
+    timezone: Option<String>,
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct DesiredMeeting {
     pub title: String,
+    pub slug: String,
     pub description: String,
     pub attendees: Vec<String>,          // email
     pub min_date: DateTime<chrono::Utc>, // Parse as a date
@@ -290,6 +230,68 @@ pub struct DesiredMeeting {
     pub timezone: Tz,
 }
 
+fn to_slug(s: &str) -> String {
+    "foo".to_string()
+}
+
+impl DesiredMeeting {
+    fn from_input_desired_meeting(i: &InputDesiredMeeting) -> DesiredMeeting {
+        let timezone = i.timezone
+            .clone()
+            .unwrap_or("America/Los_Angeles".to_string());
+        let tz: Tz = timezone.parse().unwrap();
+        let min_d = tz.from_local_datetime(&i.min_date)
+            .unwrap()
+            .with_timezone(&Utc);
+        let max_d = tz.from_local_datetime(&i.max_date)
+            .unwrap()
+            .with_timezone(&Utc);
+        let duration = chrono::Duration::minutes(i.duration.unwrap_or(30));
+        let step = chrono::Duration::minutes(i.step.unwrap_or(30));
+        DesiredMeeting {
+            title: i.title.clone(),
+            slug: to_slug(&i.title),
+            description: i.description.clone(),
+            attendees: i.attendees.clone(),
+            min_date: min_d,
+            max_date: max_d,
+            step: step,
+            duration: duration,
+            timezone: tz,
+        }
+    }
+}
+
+fn panic_if_invalid(meetings: &Vec<InputDesiredMeeting>) {
+    let all_titles = meetings
+        .iter()
+        .map(|k| k.title.to_string())
+        .collect::<Vec<String>>();
+    let all_titles_count = all_titles.len();
+    let titles_set: HashSet<String> = HashSet::from_iter(all_titles.into_iter());
+    if titles_set.len() != all_titles_count {
+        panic!("Two meetings cannot have the same title");
+    }
+}
+
+pub fn read_input_str(content: &str) -> Vec<DesiredMeeting> {
+    let input: Vec<InputDesiredMeeting> = serde_yaml::from_str(&content).unwrap();
+    panic_if_invalid(&input);
+    input
+        .iter()
+        .map(DesiredMeeting::from_input_desired_meeting)
+        .collect()
+}
+
+pub fn read_input(file: &str) -> Vec<DesiredMeeting> {
+    let mut input = File::open(file).expect("file not found");
+    let mut contents = String::new();
+    input
+        .read_to_string(&mut contents)
+        .expect("something went wrong reading the file");
+    read_input_str(&contents)
+}
+
 impl Hash for DesiredMeeting {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.title.hash(state);
@@ -297,57 +299,23 @@ impl Hash for DesiredMeeting {
     }
 }
 
-impl YamlParsable for DesiredMeeting {
-    fn from_yaml(s: &yaml_rust::Yaml) -> DesiredMeeting {
-        let timezone = s["timezone"]
-            .as_str()
-            .unwrap_or("America/Los_Angeles")
-            .to_string();
-        let tz: Tz = timezone.parse().unwrap();
-        let min_d = tz.datetime_from_str(s["min_date"].as_str().unwrap(), "%Y-%m-%d %H:%M:%S");
-        let max_d = tz.datetime_from_str(s["max_date"].as_str().unwrap(), "%Y-%m-%d %H:%M:%S");
-        let duration = s["duration"].as_i64().unwrap_or(30);
-        let step = s["step"].as_i64().unwrap_or(30);
-
-        DesiredMeeting {
-            title: s["title"].as_str().unwrap().to_string(),
-            description: s["description"].as_str().unwrap().to_string(),
-            attendees: s["attendees"]
-                .as_vec()
-                .unwrap()
-                .into_iter()
-                .map(|x| x.as_str().unwrap().to_string())
-                .collect(),
-            step: chrono::Duration::minutes(step),
-            duration: chrono::Duration::minutes(duration),
-            min_date: min_d
-                .expect("Cannot convert min date")
-                .with_timezone(&chrono::Utc),
-            max_date: max_d
-                .expect("Cannot convert max date")
-                .with_timezone(&chrono::Utc),
-            timezone: tz,
-        }
-    }
-}
-
 #[test]
 #[should_panic]
 fn panic_two_desired_meeting_same_title() {
-    Input::from_yaml_str(&test_invalid_input());
+    read_input_str(&test_invalid_input());
 }
 
 #[test]
 fn can_build_input() {
-    let a = Input::from_yaml_str(&test_input());
-    assert_eq!(a.meetings[0].title, "title");
-    assert_eq!(a.meetings[0].description, "description");
-    assert_eq!(a.meetings[0].attendees[0], "laurent.charignon@foo.com");
-    assert_eq!(a.meetings[0].timezone.name(), "America/Los_Angeles");
+    let a = read_input_str(&test_input());
+    assert_eq!(a[0].title, "title");
+    assert_eq!(a[0].description, "description");
+    assert_eq!(a[0].attendees[0], "laurent.charignon@foo.com");
+    assert_eq!(a[0].timezone.name(), "America/Los_Angeles");
     // 10 PST -> 18 UTC
     // 18 PST -> 2 UTC
-    assert_eq!(a.meetings[0].min_date.hour(), 18);
-    assert_eq!(a.meetings[0].max_date.hour(), 2);
+    assert_eq!(a[0].min_date.hour(), 18);
+    assert_eq!(a[0].max_date.hour(), 2);
 }
 
 #[test]

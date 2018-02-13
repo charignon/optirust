@@ -5,8 +5,7 @@ authors = ["Laurent Charignon <l.charignon@gmail.com>"]
 
 [dependencies]
 bio = "*"
-yaml-rust = "0.4"
-chrono = "0.4"
+chrono = {version = "0.4", features = ["serde"]}
 chrono-tz = "0.4"
 serde = "1.0"
 serde_yaml = "0.7"

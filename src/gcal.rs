@@ -112,6 +112,9 @@ fn valid_api_meeting(
     ignore_meetings_with_no_response: bool,
 ) -> bool {
     let has_bound = !l.start.unwrap().date_time.is_none() && !l.end.unwrap().date_time.is_none();
+    if l.attendees.is_none() {
+        return has_bound;
+    }
     let attendees: Vec<calendar3::EventAttendee> = l.attendees.unwrap();
     // TODO Make that more idiomatic
     // "accepted" or "tentative"

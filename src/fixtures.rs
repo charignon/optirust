@@ -1,47 +1,44 @@
-use types::{DesiredMeeting, Input, MeetingCandidate, MeetingsTree};
+use types::{DesiredMeeting, MeetingCandidate, MeetingsTree};
 use std::collections::HashMap;
+use types;
 use chrono;
 
 #[allow(dead_code)]
 pub fn test_input() -> String {
-    "
-meetings:
-  - title: title
-    description: description
-    attendees:
-    - laurent.charignon@foo.com
-    - foo.bar@laurent.com
-    min_date: 2018-02-08 10:00:00
-    max_date: 2018-02-20 18:00:00
-  - title: title2
-    description: description 2
-    attendees:
-    - laurent.charignon@foo.com
-    - contact@laurent.com
-    min_date: 2018-02-08 11:00:00
-    max_date: 2018-02-10 16:00:00
+    "- title: title
+  description: description
+  attendees:
+  - laurent.charignon@foo.com
+  - foo.bar@laurent.com
+  min_date: 2018-02-08T10:00:00
+  max_date: 2018-02-20T18:00:00
+- title: title2
+  description: description 2
+  attendees:
+  - laurent.charignon@foo.com
+  - contact@laurent.com
+  min_date: 2018-02-08T11:00:00
+  max_date: 2018-02-10T16:00:00
 "
         .to_string()
 }
 
 #[allow(dead_code)]
 pub fn test_invalid_input() -> String {
-    "
-meetings:
-  - title: title
-    description: description
-    attendees:
-    - laurent.charignon@foo.com
-    - foo.bar@laurent.com
-    min_date: 2018-02-08 10:00:00
-    max_date: 2018-02-20 18:00:00
-  - title: title
-    description: description 2
-    attendees:
-    - laurent.charignon@foo.com
-    - contact@laurent.com
-    min_date: 2018-02-08 11:00:00
-    max_date: 2018-02-10 16:00:00
+    "- title: title
+  description: description
+  attendees:
+  - laurent.charignon@foo.com
+  - foo.bar@laurent.com
+  min_date: 2018-02-08T10:00:00
+  max_date: 2018-02-20T18:00:00
+- title: title
+  description: description 2
+  attendees:
+  - laurent.charignon@foo.com
+  - contact@laurent.com
+  min_date: 2018-02-08T11:00:00
+  max_date: 2018-02-10T16:00:00
 "
         .to_string()
 }
@@ -79,14 +76,14 @@ large_rooms:
 
 #[allow(dead_code)]
 pub fn test_desired_meetings() -> Vec<DesiredMeeting> {
-    let a = Input::from_yaml_str(&test_input());
-    a.meetings.clone()
+    let a = types::read_input_str(&test_input());
+    a.clone()
 }
 
 #[allow(dead_code)]
 pub fn test_desired_meeting() -> DesiredMeeting {
-    let a = Input::from_yaml_str(&test_input());
-    a.meetings[1].clone()
+    let a = types::read_input_str(&test_input());
+    a[1].clone()
 }
 
 #[allow(dead_code)]

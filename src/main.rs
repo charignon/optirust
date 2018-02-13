@@ -10,6 +10,9 @@
 - TODO Add example files in a separate folder
 - TODO Test usability on a new host
 - TODO Log level
+- TODO Add an installer script
+- TODO Add to the description the powered by optirust tagline
+- TODO Meeting slug
 */
 extern crate bio;
 extern crate chrono;
@@ -23,7 +26,6 @@ extern crate rayon;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_yaml;
-extern crate yaml_rust;
 extern crate yup_oauth2 as oauth2;
 
 use std::collections::HashMap;
@@ -36,7 +38,7 @@ mod gen;
 mod solver;
 mod types;
 
-use types::{Config, Input, Solution};
+use types::{Config, Solution};
 
 fn main() {
     let matches = app::build_app().get_matches();
@@ -52,14 +54,13 @@ fn main() {
         }
     };
 
-    let input = Input::from_file(
+    let input = types::read_input(
         matches
             .value_of("input")
             .expect("Please give a valid input file"),
     );
 
-    let solver_input =
-        solver::SolverInput::new_from_desired_meetings_and_opts(input.meetings, &options);
+    let solver_input = solver::SolverInput::new_from_desired_meetings_and_opts(input, &options);
 
     let sol = match (options.solver_fn)(&solver_input) {
         Some(m) => Solution {
