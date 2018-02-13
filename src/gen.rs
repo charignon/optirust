@@ -80,7 +80,7 @@ pub fn generate_all_possible_meetings(
             continue;
         }
 
-        let ident = format!("{}_{}", tm.title, id);
+        let ident = format!("{}_{}", tm.slug, id);
         res.extend(generate_meetings_for_date(
             date,
             mint,

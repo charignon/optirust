@@ -231,7 +231,14 @@ pub struct DesiredMeeting {
 }
 
 fn to_slug(s: &str) -> String {
-    "foo".to_string()
+    let mut res: Vec<String> = Vec::new();
+    for u in s.chars() {
+        match u {
+            'a'...'z' | '0'...'9' | 'A'...'Z' => res.push(u.to_string()),
+            _ => {}
+        }
+    }
+    res.join("")
 }
 
 impl DesiredMeeting {
@@ -262,10 +269,10 @@ impl DesiredMeeting {
     }
 }
 
-fn panic_if_invalid(meetings: &Vec<InputDesiredMeeting>) {
+fn panic_if_invalid(meetings: &Vec<DesiredMeeting>) {
     let all_titles = meetings
         .iter()
-        .map(|k| k.title.to_string())
+        .map(|k| k.slug.to_string())
         .collect::<Vec<String>>();
     let all_titles_count = all_titles.len();
     let titles_set: HashSet<String> = HashSet::from_iter(all_titles.into_iter());
@@ -276,11 +283,12 @@ fn panic_if_invalid(meetings: &Vec<InputDesiredMeeting>) {
 
 pub fn read_input_str(content: &str) -> Vec<DesiredMeeting> {
     let input: Vec<InputDesiredMeeting> = serde_yaml::from_str(&content).unwrap();
-    panic_if_invalid(&input);
-    input
+    let meetings = input
         .iter()
         .map(DesiredMeeting::from_input_desired_meeting)
-        .collect()
+        .collect();
+    panic_if_invalid(&meetings);
+    meetings
 }
 
 pub fn read_input(file: &str) -> Vec<DesiredMeeting> {
@@ -297,6 +305,13 @@ impl Hash for DesiredMeeting {
         self.title.hash(state);
         self.description.hash(state);
     }
+}
+
+#[test]
+fn test_slug() {
+    assert_eq!(to_slug("FOO BAR"), "FOOBAR");
+    assert_eq!(to_slug("FOO-BAR"), "FOOBAR");
+    assert_eq!(to_slug("FOO : BAR"), "FOOBAR");
 }
 
 #[test]
