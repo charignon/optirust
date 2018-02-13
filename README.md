@@ -16,7 +16,7 @@ curl https://raw.githubusercontent.com/charignon/optirust/master/installer.sh | 
 - Generate credential for the google calendar api, put them in `client_secret.json` (https://docs.google.com/presentation/d/16VBTYIqoqWAeS0PW6rmPSHqyaZk5cPCo1ABByqvClSg/edit?usp=sharing)
 
 ## Usage
-- Write a config file with email address for rooms you are allowed to book (small is 1-2 people, large is 3+):
+- Write a config file containing email addresses for the rooms you are allowed to book (small is 1-2 people, large is 3+):
 ```yaml
 small_rooms:
   - foo@bar.com
