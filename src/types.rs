@@ -115,7 +115,7 @@ fn compute_score(
     score
 }
 
-// rooms available to book, small means 2 people or less
+// Config holds rooms available to book, small means 2 people or less
 // large 3+ people
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
@@ -145,7 +145,7 @@ impl Config {
         Config::from_yaml_str(&contents)
     }
 }
-// A potential meeting, linked to a desired meeting
+// A potential meeting, which is a candidate solution for a DesiredMeeting
 #[derive(Clone, PartialEq)]
 pub struct MeetingCandidate {
     pub title: String,
@@ -154,13 +154,6 @@ pub struct MeetingCandidate {
     pub end: DateTime<chrono::Utc>,
     pub room: String,
     pub score: usize,
-}
-
-impl MeetingCandidate {
-    #[allow(dead_code)]
-    pub fn intersects(&self, o: &MeetingCandidate) -> bool {
-        (self.start < o.end) && (o.start < self.end)
-    }
 }
 
 impl fmt::Debug for MeetingCandidate {
@@ -189,7 +182,7 @@ impl fmt::Debug for Solution {
 }
 
 // A meeting that is already scheduled before the program runs
-// There meetings are stored as a tree for easy intersection
+// These meetings are stored as a tree for easy intersection
 // computation
 #[derive(Debug)]
 pub struct Meeting {
@@ -217,14 +210,15 @@ struct InputDesiredMeeting {
     timezone: Option<String>,
 }
 
+// A meeting that the user wants to schedule
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct DesiredMeeting {
     pub title: String,
     pub slug: String,
     pub description: String,
-    pub attendees: Vec<String>,          // email
-    pub min_date: DateTime<chrono::Utc>, // Parse as a date
-    pub max_date: DateTime<chrono::Utc>, // Parse as a date
+    pub attendees: Vec<String>,
+    pub min_date: DateTime<chrono::Utc>,
+    pub max_date: DateTime<chrono::Utc>,
     pub step: chrono::Duration,
     pub duration: chrono::Duration,
     pub timezone: Tz,
