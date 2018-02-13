@@ -21,19 +21,22 @@ large_rooms:
 
 - Write an input file with the meetings you would like to book:
 ```yaml
-meetings:
-  - title: title
-    description: description
-    attendees:
-    - my_address@gmail.com
-    min_date: 2018-02-05 10:00:00
-    max_date: 2030-02-20 18:00:00
-  - title: title2
-    description: description
-    attendees:
-    - my_address@gmail.com
-    min_date: 2018-02-05 10:00:00
-    max_date: 2030-02-20 18:00:00
+- title: title
+  description: |
+    this is my very very very
+    long description for a
+    very very interesting
+    meeting
+  attendees:
+  - my_address@gmail.com
+  min_date: 2018-02-05 10:00:00
+  max_date: 2030-02-20 18:00:00
+- title: title2
+  description: description
+  attendees:
+  - my_address@gmail.com
+  min_date: 2018-02-05 10:00:00
+  max_date: 2030-02-20 18:00:00
 ```
 
 - Run the code in dry run mode: `cargo run -- --input input --config config` (it will print the meeting that would be booked if you ran it with the `--book` flag)
