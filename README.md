@@ -2,8 +2,14 @@
 
 Optimized meeting scheduling with Google Calendar API
 
-## Installation
+## Automatic Installation
 
+Go to a folder of your choosing and run:
+```
+curl https://raw.githubusercontent.com/charignon/optirust/master/installer.sh | sh
+```
+
+## Manual installation
 - Install rust with rustup (https://www.rustup.rs/)
 - Download or build the cbc solver (you can use the one from https://github.com/coin-or/pulp)
 - Clone this repo.
