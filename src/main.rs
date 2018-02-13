@@ -1,18 +1,13 @@
 /* Project Optirust
 
-- TODO Use serde
-- TODO Better testing for generate_solution!
 - TODO Make it possible to accept day long event
 - TODO Make sure the code works when no room specified
 
-- TODO Make the input parsing return a vector of desired meetingd
 - TODO Make constraints configurable using a config file
 - TODO Add example files in a separate folder
 - TODO Test usability on a new host
 - TODO Log level
-- TODO Add an installer script
 - TODO Add to the description the powered by optirust tagline
-- TODO Meeting slug
 */
 extern crate bio;
 extern crate chrono;
