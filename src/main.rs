@@ -1,13 +1,9 @@
 /* Project Optirust
 
 - TODO Make it possible to accept day long event
-- TODO Make sure the code works when no room specified
-
 - TODO Make constraints configurable using a config file
-- TODO Add example files in a separate folder
 - TODO Test usability on a new host
 - TODO Log level
-- TODO Add to the description the powered by optirust tagline
 */
 extern crate bio;
 extern crate chrono;
@@ -81,7 +77,7 @@ fn main() {
         0 => println!("Dry run mode, not booking!"),
         _ => {
             println!("Booking!");
-            gcal::book_with_api(&sol);
+            gcal::book_with_api(&sol, true);
         }
     }
 }

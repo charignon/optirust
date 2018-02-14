@@ -36,6 +36,7 @@ type CalendarHubType = CalendarHub<
 fn candidate_and_meeting_to_event(
     desired_meeting: &DesiredMeeting,
     candidate: &MeetingCandidate,
+    include_tagline: bool,
 ) -> calendar3::Event {
     let mut attendees: Vec<String> = Vec::new();
     attendees.extend(desired_meeting.attendees.clone());
@@ -54,6 +55,16 @@ fn candidate_and_meeting_to_event(
             .collect::<Vec<calendar3::EventAttendee>>(),
     );
 
+    let description = if include_tagline {
+        format!(
+            "{}\n{}",
+            desired_meeting.description,
+            "=> Booked by Optirust: https://github.com/charignon/optirust"
+        )
+    } else {
+        desired_meeting.description.clone()
+    };
+
     calendar3::Event {
         attendees,
         start: Some(calendar3::EventDateTime {
@@ -64,7 +75,7 @@ fn candidate_and_meeting_to_event(
             date_time: Some(candidate.end.to_rfc3339()),
             ..Default::default()
         }),
-        description: Some(desired_meeting.description.to_string()),
+        description: Some(description),
         reminders: Some(calendar3::EventReminders {
             use_default: Some(true),
             overrides: None,
@@ -74,11 +85,15 @@ fn candidate_and_meeting_to_event(
     }
 }
 
-pub fn book_with_api(s: &Solution) {
+pub fn book_with_api(s: &Solution, include_tagline: bool) {
     let mut es: Vec<calendar3::Event> = Vec::new();
 
     for (desired_meeting, candidate) in &s.candidates {
-        es.push(candidate_and_meeting_to_event(desired_meeting, candidate));
+        es.push(candidate_and_meeting_to_event(
+            desired_meeting,
+            candidate,
+            include_tagline,
+        ));
     }
 
     es.par_iter()
