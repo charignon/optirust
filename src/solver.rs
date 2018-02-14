@@ -48,7 +48,9 @@ fn extract_attendees(i: &[DesiredMeeting], c: &RoomPickerFnType) -> Vec<String> 
             .iter()
             .map(|k| k.to_string())
             .collect::<Vec<String>>();
-        s.extend(c(attendees.len()));
+        if let Some(rooms) = c(attendees.len()) {
+            s.extend(rooms);
+        }
         s.extend(attendees);
     }
     Vec::from_iter(s.into_iter())
@@ -63,7 +65,7 @@ fn generate_meeting_candidate(
     scoring_fn: &ScoringFnType,
     i: &Meeting,
 ) -> Option<MeetingCandidate> {
-    let possible_rooms: Vec<String> = room_picker(tm.attendees.len());
+    let possible_rooms: Option<Vec<String>> = room_picker(tm.attendees.len());
     let mandatory_attendees = &tm.attendees;
     let conflicts: usize = mandatory_attendees
         .iter()
@@ -76,10 +78,12 @@ fn generate_meeting_candidate(
 
     // What is a suitable room?
     let mut suitable_room: Option<String> = None;
-    for r in &possible_rooms {
-        if avail[r].find(i.start..i.end).count() == 0 {
-            suitable_room = Some(r.to_string());
-            break;
+    if let Some(possible_rooms) = possible_rooms {
+        for r in &possible_rooms {
+            if avail[r].find(i.start..i.end).count() == 0 {
+                suitable_room = Some(r.to_string());
+                break;
+            }
         }
     }
 
@@ -89,7 +93,7 @@ fn generate_meeting_candidate(
         id: ident,
         start: i.start,
         end: i.end,
-        room: suitable_room?,
+        room: suitable_room,
         score: scoring_fn(&i.start, &i.end, mandatory_attendees, avail),
     })
 }
@@ -122,7 +126,7 @@ fn test_new_from_desired_meetings_and_opts() {
     // Create a desired meetings
     let desired_meetings = fixtures::test_desired_meetings();
     let options = Options {
-        room_picker_fn: Box::new(|_| vec!["room@bar.html".to_string()]),
+        room_picker_fn: Box::new(|_| Some(vec!["room@bar.html".to_string()])),
         fetch_fn: Box::new(|emails, _, _| fixtures::fetch_results(emails)),
         ..Default::default()
     };

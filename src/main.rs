@@ -38,14 +38,17 @@ use types::{Config, Solution};
 fn main() {
     let matches = app::build_app().get_matches();
     let options = {
-        let config = Config::from_file(
-            matches
-                .value_of("config")
-                .expect("Please give a valid config file"),
-        );
-        types::Options {
-            room_picker_fn: Box::new(move |k| config.room_picker(k)),
-            ..Default::default()
+        let config_filename = matches.value_of("config");
+        if let Some(config_filename) = config_filename {
+            let config = Config::from_file(config_filename);
+            types::Options {
+                room_picker_fn: Box::new(move |k| config.room_picker(k)),
+                ..Default::default()
+            }
+        } else {
+            types::Options {
+                ..Default::default()
+            }
         }
     };
 

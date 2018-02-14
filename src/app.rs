@@ -19,8 +19,7 @@ pub fn build_app() -> App<'static, 'static> {
                 .short("c")
                 .long("config")
                 .takes_value(true)
-                .help("Sets the config file to use")
-                .required(true),
+                .help("Sets the config file to use"),
         )
         .arg(
             Arg::with_name("book")

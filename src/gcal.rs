@@ -39,7 +39,9 @@ fn candidate_and_meeting_to_event(
 ) -> calendar3::Event {
     let mut attendees: Vec<String> = Vec::new();
     attendees.extend(desired_meeting.attendees.clone());
-    attendees.push(candidate.room.to_string());
+    if let Some(room) = candidate.room.clone() {
+        attendees.push(room);
+    }
 
     let attendees = Some(
         attendees

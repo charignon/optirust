@@ -21,7 +21,7 @@ pub type ScoringFnType = Box<
 >;
 pub type RejectDateTimeFnType = Box<Fn(chrono::DateTime<Tz>, chrono::DateTime<Tz>) -> bool>;
 pub type RejectDateFnType = Box<Fn(chrono::Date<Tz>) -> bool>;
-pub type RoomPickerFnType = Box<Fn(usize) -> Vec<String>>;
+pub type RoomPickerFnType = Box<Fn(usize) -> Option<Vec<String>>>;
 pub type SolverFnType =
     Box<Fn(&solver::SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>>>;
 pub type FetchFnType = Box<Fn(Vec<String>, bool, bool) -> HashMap<String, MeetingsTree>>;
@@ -76,7 +76,7 @@ impl Default for Options {
             scoring_fn: Box::new(compute_score),
             ignore_all_day_events: true,
             ignore_meetings_with_no_response: true,
-            room_picker_fn: Box::new(|_| vec![]),
+            room_picker_fn: Box::new(|_| None),
             reject_date_fn: Box::new(gen::default_reject_date),
             reject_datetime_fn: Box::new(gen::default_reject_datetime),
         }
@@ -119,8 +119,8 @@ fn compute_score(
 // large 3+ people
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Config {
-    pub small_rooms: Vec<String>,
-    pub large_rooms: Vec<String>,
+    pub small_rooms: Option<Vec<String>>,
+    pub large_rooms: Option<Vec<String>>,
 }
 
 impl Config {
@@ -128,7 +128,7 @@ impl Config {
         serde_yaml::from_str(&s).unwrap()
     }
 
-    pub fn room_picker(&self, size: usize) -> Vec<String> {
+    pub fn room_picker(&self, size: usize) -> Option<Vec<String>> {
         if size <= 2 {
             self.small_rooms.clone()
         } else {
@@ -152,7 +152,7 @@ pub struct MeetingCandidate {
     pub id: String,
     pub start: DateTime<chrono::Utc>,
     pub end: DateTime<chrono::Utc>,
-    pub room: String,
+    pub room: Option<String>,
     pub score: usize,
 }
 
@@ -330,5 +330,5 @@ fn can_build_input() {
 #[test]
 fn can_build_config() {
     let a = Config::from_yaml_str(&test_config());
-    assert_eq!(a.large_rooms[0], "bozorg@jam.com")
+    assert_eq!(a.large_rooms.unwrap()[0], "bozorg@jam.com")
 }

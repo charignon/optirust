@@ -101,7 +101,7 @@ pub fn sample_candidate_a() -> MeetingCandidate {
         id: "id10873".to_string(),
         start: chrono::Utc::now(),
         end: chrono::Utc::now(),
-        room: "foo".to_string(),
+        room: Some("foo".to_string()),
         score: 23,
     }
 }
@@ -113,7 +113,7 @@ pub fn sample_candidate_b() -> MeetingCandidate {
         id: "0".to_string(),
         start: chrono::Utc::now(),
         end: chrono::Utc::now(),
-        room: "bar".to_string(),
+        room: Some("bar".to_string()),
         score: 23,
     }
 }
