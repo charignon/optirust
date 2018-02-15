@@ -15,17 +15,32 @@ use self::oauth2::{read_application_secret, ApplicationSecret, Authenticator,
 use self::hyper::net::HttpsConnector;
 use self::rayon::prelude::*;
 use chrono::prelude::*;
+use chrono_tz::Tz;
 
 impl Meeting {
     fn from_api(s: calendar3::Event) -> Meeting {
-        Meeting {
-            id: s.id.unwrap(),
-            start: chrono::DateTime::parse_from_rfc3339(&s.start.unwrap().date_time.unwrap())
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-            end: chrono::DateTime::parse_from_rfc3339(&s.end.unwrap().date_time.unwrap())
-                .unwrap()
-                .with_timezone(&chrono::Utc),
+        if s.start.clone().unwrap().date_time.is_none() {
+            // All day event
+            // TODO Build a better solution for this
+            let tz: Tz = "America/Los_Angeles".parse().unwrap();
+            let start_date = chrono::NaiveDate::parse_from_str(&s.start.unwrap().date.unwrap(), "%Y-%m-%d").unwrap().and_hms(0,0,0);
+            let end_date = chrono::NaiveDate::parse_from_str(&s.end.unwrap().date.unwrap(), "%Y-%m-%d").unwrap().and_hms(0,0,0);
+            Meeting {
+                id: s.id.unwrap(),
+                start: tz.from_local_datetime(&start_date).unwrap().with_timezone(&chrono::Utc),
+                end: tz.from_local_datetime(&end_date).unwrap().with_timezone(&chrono::Utc),
+            }
+        } else {
+            // Other event
+            Meeting {
+                id: s.id.unwrap(),
+                start: chrono::DateTime::parse_from_rfc3339(&s.start.unwrap().date_time.unwrap())
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                end: chrono::DateTime::parse_from_rfc3339(&s.end.unwrap().date_time.unwrap())
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            }
         }
     }
 }
@@ -125,10 +140,13 @@ pub fn get_calendar_hub() -> CalendarHubType {
 fn valid_api_meeting(
     person: &str,
     l: calendar3::Event,
-    _ignore_all_day_events: bool,
+    ignore_all_day_events: bool,
     ignore_meetings_with_no_response: bool,
 ) -> bool {
-    let has_bound = !l.start.unwrap().date_time.is_none() && !l.end.unwrap().date_time.is_none();
+
+    let has_bound = (!l.start.clone().unwrap().date_time.is_none() && !l.end.clone().unwrap().date_time.is_none()) ||
+                     (!ignore_all_day_events && !l.start.unwrap().date.is_none() && !l.end.unwrap().date.is_none());
+
     if l.attendees.is_none() {
         return has_bound;
     }
