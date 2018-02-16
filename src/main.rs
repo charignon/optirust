@@ -1,8 +1,14 @@
 /* Project Optirust
 
-- TODO Make constraints configurable using a config file
-- TODO Test usability on a new host
-- TODO Log level
+- TODO Make constraints configurable using a config file (30')
+- Define a constraint as something that is either a time range or a week day number
+- Add constraints definition to options and make that testable
+
+- TODO Add boolean flag override in the config (20')
+- And create a method to generate the option struct
+
+- TODO Move all of my special requirements into the config and add a sample config with the default commented (20')
+- TODO Test usability on a new host (30')
 */
 extern crate bio;
 extern crate chrono;
