@@ -53,14 +53,14 @@ cat <<EOF > input
     meeting
   attendees:
   - my_address@gmail.com
-  min_date: 2018-02-05 10:00:00
-  max_date: 2030-02-20 18:00:00
+  min_date: 2018-02-05T10:00:00
+  max_date: 2030-02-20T18:00:00
 - title: title2
   description: description
   attendees:
   - my_address@gmail.com
-  min_date: 2018-02-05 10:00:00
-  max_date: 2030-02-20 18:00:00
+  min_date: 2018-02-05T10:00:00
+  max_date: 2030-02-20T18:00:00
 EOF
 
 cat <<EOF > config
@@ -75,11 +75,11 @@ reject_iso_weekday:
   - 7 # Sunday
 reject_hour_range:
   # Lunch
-  - from: 
+  - from:
       hours: 12
       minutes: 0
       seconds: 0
-    to: 
+    to:
       hours: 13
       minutes: 0
       seconds: 0

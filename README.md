@@ -51,14 +51,14 @@ ignore_meetings_with_no_response: true
     meeting
   attendees:
   - my_address@gmail.com
-  min_date: 2018-02-05 10:00:00
-  max_date: 2030-02-20 18:00:00
+  min_date: 2018-02-05T10:00:00
+  max_date: 2030-02-20T18:00:00
 - title: title2
   description: description
   attendees:
   - my_address@gmail.com
-  min_date: 2018-02-05 10:00:00
-  max_date: 2030-02-20 18:00:00
+  min_date: 2018-02-05T10:00:00
+  max_date: 2030-02-20T18:00:00
 ```
 
 Optirust can help you schedule these meetings optimally and find rooms to host them:
