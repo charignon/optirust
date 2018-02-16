@@ -20,11 +20,9 @@ use chrono_tz::Tz;
 const MALFORMED_ERR:&str = "Malformed google event";
 
 impl Meeting {
-    fn from_api(s: calendar3::Event) -> Meeting {
+    fn from_api(s: calendar3::Event, tz: &Tz) -> Meeting {
         if s.start.clone().expect(MALFORMED_ERR).date_time.is_none() {
             // All day event
-            // TODO Build a better solution for this
-            let tz: Tz = "America/Los_Angeles".parse().expect("Cannot parse timezone");
             let start_date = chrono::NaiveDate::parse_from_str(
                 &s.start .expect(MALFORMED_ERR).date.expect(MALFORMED_ERR), "%Y-%m-%d"
             ).expect("Cannot parse date").and_hms(0,0,0);
@@ -214,6 +212,7 @@ fn fetch_one_availability_with_api(
         .time_min(&chrono::Utc::now().to_rfc3339())
         .doit();
     let (_, events) = result.expect("Cannot reach google API");
+    let timezone:Tz = events.time_zone.expect(MALFORMED_ERR).parse().expect("Cannot decode timezone");
     let events: Vec<calendar3::Event> = events.items.expect(MALFORMED_ERR);
 
     meetings_to_tree(&events
@@ -226,7 +225,7 @@ fn fetch_one_availability_with_api(
                 ignore_meetings_with_no_response,
             )
         })
-        .map(Meeting::from_api)
+        .map(|o| Meeting::from_api(o, &timezone))
         .collect::<Vec<Meeting>>())
 }
 
