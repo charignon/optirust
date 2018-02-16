@@ -66,6 +66,11 @@ pub struct Options {
     // try to schedule over them
     // default: true
     pub ignore_meetings_with_no_response: bool,
+
+    // If true will also try to book meeting in the psat if the range
+    // includes time in the past, this is mostly useful for testing and should
+    // generally be false (default value)
+    pub consider_meetings_in_the_past: bool
 }
 
 impl Default for Options {
@@ -76,6 +81,7 @@ impl Default for Options {
             scoring_fn: Box::new(compute_score),
             ignore_all_day_events: true,
             ignore_meetings_with_no_response: true,
+            consider_meetings_in_the_past: false,
             room_picker_fn: Box::new(|_| None),
             reject_date_fn: Box::new(gen::default_reject_date),
             reject_datetime_fn: Box::new(gen::default_reject_datetime),

@@ -1,6 +1,5 @@
 /* Project Optirust
 
-- TODO Don't try to book meetings in the past
 - TODO Better whole day event support, maybe pass in the desired timezone to the fetcher? Is there a default TZ for the calendar?
 - TODO Make constraints configurable using a config file
 - TODO Test usability on a new host

@@ -130,6 +130,7 @@ fn test_new_from_desired_meetings_and_opts() {
     let options = Options {
         room_picker_fn: Box::new(|_| Some(vec!["room@bar.html".to_string()])),
         fetch_fn: Box::new(|emails, _, _| fixtures::fetch_results(emails)),
+        consider_meetings_in_the_past: true,
         ..Default::default()
     };
     let k = SolverInput::new_from_desired_meetings_and_opts(desired_meetings.clone(), &options);
@@ -175,12 +176,16 @@ impl SolverInput {
             opts.ignore_all_day_events,
             opts.ignore_meetings_with_no_response,
         );
+        let now = chrono::Utc::now();
         for me in desired_meetings {
             for interval in gen::generate_all_possible_meetings(
                 &me,
                 &*opts.reject_date_fn,
                 &*opts.reject_datetime_fn,
             ) {
+                if !opts.consider_meetings_in_the_past && interval.start < now {
+                    continue;
+                }
                 if let Some(m) = generate_meeting_candidate(
                     &me,
                     &avail,
