@@ -125,7 +125,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_yaml_str(s: &str) -> Config {
-        serde_yaml::from_str(&s).unwrap()
+        serde_yaml::from_str(&s).expect("Cannot decode YAML")
     }
 
     pub fn room_picker(&self, size: usize) -> Option<Vec<String>> {
@@ -240,7 +240,7 @@ impl DesiredMeeting {
         let timezone = i.timezone
             .clone()
             .unwrap_or("America/Los_Angeles".to_string());
-        let tz: Tz = timezone.parse().unwrap();
+        let tz: Tz = timezone.parse().expect("Cannot parse timezone!");
         let min_d = tz.from_local_datetime(&i.min_date)
             .unwrap()
             .with_timezone(&Utc);
@@ -276,7 +276,9 @@ fn panic_if_invalid(meetings: &Vec<DesiredMeeting>) {
 }
 
 pub fn read_input_str(content: &str) -> Vec<DesiredMeeting> {
-    let input: Vec<InputDesiredMeeting> = serde_yaml::from_str(&content).unwrap();
+    let input: Vec<InputDesiredMeeting> = serde_yaml::from_str(&content).expect(
+        "Cannot decode input, the format looks incorrect, please check the documentation"
+    );
     let meetings = input
         .iter()
         .map(DesiredMeeting::from_input_desired_meeting)
@@ -286,7 +288,7 @@ pub fn read_input_str(content: &str) -> Vec<DesiredMeeting> {
 }
 
 pub fn read_input(file: &str) -> Vec<DesiredMeeting> {
-    let mut input = File::open(file).expect("file not found");
+    let mut input = File::open(file).expect("input file not found");
     let mut contents = String::new();
     input
         .read_to_string(&mut contents)

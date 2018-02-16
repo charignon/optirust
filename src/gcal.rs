@@ -17,28 +17,34 @@ use self::rayon::prelude::*;
 use chrono::prelude::*;
 use chrono_tz::Tz;
 
+const MALFORMED_ERR:&str = "Malformed google event";
+
 impl Meeting {
     fn from_api(s: calendar3::Event) -> Meeting {
-        if s.start.clone().unwrap().date_time.is_none() {
+        if s.start.clone().expect(MALFORMED_ERR).date_time.is_none() {
             // All day event
             // TODO Build a better solution for this
-            let tz: Tz = "America/Los_Angeles".parse().unwrap();
-            let start_date = chrono::NaiveDate::parse_from_str(&s.start.unwrap().date.unwrap(), "%Y-%m-%d").unwrap().and_hms(0,0,0);
-            let end_date = chrono::NaiveDate::parse_from_str(&s.end.unwrap().date.unwrap(), "%Y-%m-%d").unwrap().and_hms(0,0,0);
+            let tz: Tz = "America/Los_Angeles".parse().expect("Cannot parse timezone");
+            let start_date = chrono::NaiveDate::parse_from_str(
+                &s.start .expect(MALFORMED_ERR).date.expect(MALFORMED_ERR), "%Y-%m-%d"
+            ).expect("Cannot parse date").and_hms(0,0,0);
+            let end_date = chrono::NaiveDate::parse_from_str(
+                &s.end.expect(MALFORMED_ERR).date.expect(MALFORMED_ERR), "%Y-%m-%d"
+            ).expect("Cannot parse date").and_hms(0,0,0);
             Meeting {
-                id: s.id.unwrap(),
+                id: s.id.expect(MALFORMED_ERR),
                 start: tz.from_local_datetime(&start_date).unwrap().with_timezone(&chrono::Utc),
                 end: tz.from_local_datetime(&end_date).unwrap().with_timezone(&chrono::Utc),
             }
         } else {
             // Other event
             Meeting {
-                id: s.id.unwrap(),
-                start: chrono::DateTime::parse_from_rfc3339(&s.start.unwrap().date_time.unwrap())
-                    .unwrap()
+                id: s.id.expect(MALFORMED_ERR),
+                start: chrono::DateTime::parse_from_rfc3339(&s.start.expect(MALFORMED_ERR).date_time.expect(MALFORMED_ERR))
+                    .expect(MALFORMED_ERR)
                     .with_timezone(&chrono::Utc),
-                end: chrono::DateTime::parse_from_rfc3339(&s.end.unwrap().date_time.unwrap())
-                    .unwrap()
+                end: chrono::DateTime::parse_from_rfc3339(&s.end.expect(MALFORMED_ERR).date_time.expect(MALFORMED_ERR))
+                    .expect(MALFORMED_ERR)
                     .with_timezone(&chrono::Utc),
             }
         }
@@ -117,7 +123,7 @@ pub fn book_with_api(s: &Solution, include_tagline: bool) {
                 .events()
                 .insert(e.clone(), "primary")
                 .doit()
-                .unwrap()
+                .expect("Cannot reach the google calendar API")
         })
         .collect::<Vec<(hyper::client::Response, calendar3::Event)>>();
 }
@@ -130,7 +136,7 @@ pub fn get_calendar_hub() -> CalendarHubType {
         &secret,
         DefaultAuthenticatorDelegate,
         client,
-        DiskTokenStorage::new(&"token_store.json".to_string()).unwrap(),
+        DiskTokenStorage::new(&"token_store.json".to_string()).expect("Cannot create token store"),
         Some(FlowType::InstalledInteractive),
     );
     let client = hyper::Client::with_connector(HttpsConnector::new(hyper_rustls::TlsClient::new()));
@@ -144,19 +150,19 @@ fn valid_api_meeting(
     ignore_meetings_with_no_response: bool,
 ) -> bool {
 
-    let has_bound = (!l.start.clone().unwrap().date_time.is_none() && !l.end.clone().unwrap().date_time.is_none()) ||
-                     (!ignore_all_day_events && !l.start.unwrap().date.is_none() && !l.end.unwrap().date.is_none());
+    let has_bound = (!l.start.clone().expect(MALFORMED_ERR).date_time.is_none() && !l.end.clone().expect(MALFORMED_ERR).date_time.is_none()) ||
+                     (!ignore_all_day_events && !l.start.expect(MALFORMED_ERR).date.is_none() && !l.end.expect(MALFORMED_ERR).date.is_none());
 
     if l.attendees.is_none() {
         return has_bound;
     }
-    let attendees: Vec<calendar3::EventAttendee> = l.attendees.unwrap();
+    let attendees: Vec<calendar3::EventAttendee> = l.attendees.expect(MALFORMED_ERR);
     // TODO Make that more idiomatic
     // "accepted" or "tentative"
     let attendees_status: Vec<String> = attendees
         .into_iter()
         .filter(|k| k.email.clone().unwrap_or_else(|| "XXX".to_string()) == person)
-        .map(|l| l.response_status.unwrap())
+        .map(|l| l.response_status.expect(MALFORMED_ERR))
         .collect();
     if attendees_status.len() != 1 {
         return false;
@@ -207,8 +213,8 @@ fn fetch_one_availability_with_api(
         .single_events(true)
         .time_min(&chrono::Utc::now().to_rfc3339())
         .doit();
-    let (_, events) = result.unwrap();
-    let events: Vec<calendar3::Event> = events.items.unwrap();
+    let (_, events) = result.expect("Cannot reach google API");
+    let events: Vec<calendar3::Event> = events.items.expect(MALFORMED_ERR);
 
     meetings_to_tree(&events
         .into_iter()
@@ -256,5 +262,5 @@ const CLIENT_SECRET_FILE: &str = "client_secret.json";
 
 // reads the JSON secret file
 fn read_client_secret(file: &str) -> ApplicationSecret {
-    read_application_secret(Path::new(file)).unwrap()
+    read_application_secret(Path::new(file)).expect("Cannot find credential, did you create client_secret.json?")
 }

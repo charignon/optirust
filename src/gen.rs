@@ -16,7 +16,7 @@ fn generate_meetings_for_date(
 ) -> Vec<Meeting> {
     let mut counter = 0;
     let mut res: Vec<Meeting> = Vec::new();
-    let mut t = date.and_time(mint).unwrap();
+    let mut t = date.and_time(mint).expect("Cannot parse min date");
     loop {
         let ident = format!("{}_{}", id, counter);
         let start = t;
@@ -47,9 +47,9 @@ pub fn default_reject_date(date: chrono::Date<Tz>) -> bool {
 pub fn default_reject_datetime(start: chrono::DateTime<Tz>, end: chrono::DateTime<Tz>) -> bool {
     let date = start.date();
     let lunch_start = date.and_time(chrono::NaiveTime::from_hms(12, 00, 00))
-        .unwrap();
+        .expect("Cannot parse date for lunch");
     let lunch_end = date.and_time(chrono::NaiveTime::from_hms(13, 00, 00))
-        .unwrap();
+        .expect("Cannot parse date for lunch");
     (start < lunch_end) && (end > lunch_start)
 }
 
