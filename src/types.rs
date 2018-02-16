@@ -45,12 +45,12 @@ pub struct Options {
     pub room_picker_fn: RoomPickerFnType,
 
     // Function to decide what day to reject. You can use that to reject meetings on
-    // weekend for example
+    // weekend for example. True will reject, False accept.
     // Default: reject Wednesdays and weekend
     pub reject_date_fn: RejectDateFnType,
 
     // Function what slot to reject, you can use that to reject meetings over
-    // lunch for example
+    // lunch for example. True will reject, False accept.
     // Default: reject meeting over lunch (12 to 1pm)
     pub reject_datetime_fn: RejectDateTimeFnType,
 
@@ -70,7 +70,7 @@ pub struct Options {
     // If true will also try to book meeting in the psat if the range
     // includes time in the past, this is mostly useful for testing and should
     // generally be false (default value)
-    pub consider_meetings_in_the_past: bool
+    pub consider_meetings_in_the_past: bool,
 }
 
 impl Default for Options {
@@ -79,8 +79,8 @@ impl Default for Options {
             fetch_fn: Box::new(gcal::fetch_availability_with_api),
             solver_fn: Box::new(solver::solve_with_cbc_solver),
             scoring_fn: Box::new(compute_score),
-            ignore_all_day_events: true,
-            ignore_meetings_with_no_response: true,
+            ignore_all_day_events: default_ignore_all_day_events(),
+            ignore_meetings_with_no_response: default_ignore_meetings_with_no_response(),
             consider_meetings_in_the_past: false,
             room_picker_fn: Box::new(|_| None),
             reject_date_fn: Box::new(gen::default_reject_date),
@@ -121,12 +121,38 @@ fn compute_score(
     score
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct HourSpec {
+    pub hours: u32,
+    pub minutes: u32,
+    pub seconds: u32,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct HourRange {
+    pub from: HourSpec,
+    pub to: HourSpec,
+}
+
 // Config holds rooms available to book, small means 2 people or less
 // large 3+ people
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub small_rooms: Option<Vec<String>>,
     pub large_rooms: Option<Vec<String>>,
+    pub reject_iso_weekday: Option<Vec<u32>>,
+    pub reject_hour_range: Option<Vec<HourRange>>,
+    #[serde(default = "default_ignore_all_day_events")]
+    pub ignore_all_day_events: bool,
+    #[serde(default = "default_ignore_meetings_with_no_response")]
+    pub ignore_meetings_with_no_response: bool,
+}
+fn default_ignore_all_day_events() -> bool {
+    true
+}
+
+fn default_ignore_meetings_with_no_response() -> bool {
+    true
 }
 
 impl Config {
@@ -140,6 +166,46 @@ impl Config {
         } else {
             self.large_rooms.clone()
         }
+    }
+
+    pub fn reject_date_fn(&self, d: chrono::Date<Tz>) -> bool {
+        if self.reject_iso_weekday.is_none() {
+            return false;
+        }
+        let cur = d.weekday().number_from_monday();
+        for rej in self.reject_iso_weekday.clone().unwrap() {
+            if rej == cur {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn reject_datetime_fn(
+        &self,
+        start: chrono::DateTime<Tz>,
+        end: chrono::DateTime<Tz>,
+    ) -> bool {
+        if self.reject_hour_range.is_none() {
+            return false;
+        }
+        let date = start.date();
+        for k in self.reject_hour_range.clone().unwrap() {
+            let rej_start = date.and_time(chrono::NaiveTime::from_hms(
+                k.from.hours,
+                k.from.minutes,
+                k.from.seconds,
+            )).expect("Cannot parse constraint hour range");
+            let rej_end = date.and_time(chrono::NaiveTime::from_hms(
+                k.to.hours,
+                k.to.minutes,
+                k.to.seconds,
+            )).expect("Cannot parse constraint hour range");
+            if (start < rej_end) && (end > rej_start) {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn from_file(file: &str) -> Config {
@@ -282,9 +348,8 @@ fn panic_if_invalid(meetings: &Vec<DesiredMeeting>) {
 }
 
 pub fn read_input_str(content: &str) -> Vec<DesiredMeeting> {
-    let input: Vec<InputDesiredMeeting> = serde_yaml::from_str(&content).expect(
-        "Cannot decode input, the format looks incorrect, please check the documentation"
-    );
+    let input: Vec<InputDesiredMeeting> = serde_yaml::from_str(&content)
+        .expect("Cannot decode input, the format looks incorrect, please check the documentation");
     let meetings = input
         .iter()
         .map(DesiredMeeting::from_input_desired_meeting)
@@ -338,5 +403,6 @@ fn can_build_input() {
 #[test]
 fn can_build_config() {
     let a = Config::from_yaml_str(&test_config());
-    assert_eq!(a.large_rooms.unwrap()[0], "bozorg@jam.com")
+    assert_eq!(a.large_rooms.unwrap()[0], "bozorg@jam.com");
+    assert_eq!(a.ignore_all_day_events, false);
 }

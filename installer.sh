@@ -69,6 +69,22 @@ small_rooms:
   - joe@baz.com
 large_rooms:
   - bozorg@jam.com
+reject_iso_weekday:
+  - 3 # Wednesday
+  - 6 # Saturday
+  - 7 # Sunday
+reject_hour_range:
+  # Lunch
+  - from: 
+      hours: 12
+      minutes: 0
+      seconds: 0
+    to: 
+      hours: 13
+      minutes: 0
+      seconds: 0
+ignore_all_day_events: true
+ignore_meetings_with_no_response: true
 EOF
 
 log "Your optirust installation is at $(pwd)"

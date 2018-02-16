@@ -1,13 +1,4 @@
 /* Project Optirust
-
-- TODO Make constraints configurable using a config file (30')
-- Define a constraint as something that is either a time range or a week day number
-- Add constraints definition to options and make that testable
-
-- TODO Add boolean flag override in the config (20')
-- And create a method to generate the option struct
-
-- TODO Move all of my special requirements into the config and add a sample config with the default commented (20')
 - TODO Test usability on a new host (30')
 */
 extern crate bio;
@@ -42,8 +33,16 @@ fn main() {
         let config_filename = matches.value_of("config");
         if let Some(config_filename) = config_filename {
             let config = Config::from_file(config_filename);
+            let (c, d, e) = (config.clone(), config.clone(), config.clone());
+            let room_picker = Box::new(move |k| c.room_picker(k));
+            let reject_date = Box::new(move |k| d.reject_date_fn(k));
+            let reject_datetime = Box::new(move |k, l| e.reject_datetime_fn(k, l));
             types::Options {
-                room_picker_fn: Box::new(move |k| config.room_picker(k)),
+                room_picker_fn: room_picker,
+                reject_date_fn: reject_date,
+                reject_datetime_fn: reject_datetime,
+                ignore_all_day_events: config.ignore_all_day_events,
+                ignore_meetings_with_no_response: config.ignore_meetings_with_no_response,
                 ..Default::default()
             }
         } else {

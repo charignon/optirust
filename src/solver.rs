@@ -21,9 +21,8 @@ pub struct SolverInput {
 }
 
 pub fn solve_with_cbc_solver(s: &SolverInput) -> Option<HashMap<DesiredMeeting, MeetingCandidate>> {
-    let mut buffer = File::create("temp.lp").expect(
-        "Cannot create temporary file to store the optimization problem"
-    );
+    let mut buffer = File::create("temp.lp")
+        .expect("Cannot create temporary file to store the optimization problem");
     buffer
         .write_all(s.to_lp_fmt().as_bytes())
         .expect("Cannot write to disk!");
@@ -291,7 +290,9 @@ fn read_cbc_solver_solution(
     solver_input: &SolverInput,
 ) -> Option<HashMap<DesiredMeeting, MeetingCandidate>> {
     let mut lines = solution.lines();
-    let first_line = lines.next().expect("Cannot read first line of solution, is cbc installed?");
+    let first_line = lines
+        .next()
+        .expect("Cannot read first line of solution, is cbc installed?");
     if !first_line.contains("Optimal") {
         return None;
     }
@@ -316,7 +317,9 @@ fn read_cbc_solver_solution(
                 .desired_meetings
                 .iter()
                 .find(|k| k.title == candidate.title)
-                .expect("Programming error, mismatch between solver output and what was given as input");
+                .expect(
+                    "Programming error, mismatch between solver output and what was given as input",
+                );
 
             res.insert(desired_meeting.clone(), candidate.clone());
         }

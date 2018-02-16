@@ -17,31 +17,45 @@ use self::rayon::prelude::*;
 use chrono::prelude::*;
 use chrono_tz::Tz;
 
-const MALFORMED_ERR:&str = "Malformed google event";
+const MALFORMED_ERR: &str = "Malformed google event";
 
 impl Meeting {
     fn from_api(s: calendar3::Event, tz: &Tz) -> Meeting {
         if s.start.clone().expect(MALFORMED_ERR).date_time.is_none() {
             // All day event
             let start_date = chrono::NaiveDate::parse_from_str(
-                &s.start .expect(MALFORMED_ERR).date.expect(MALFORMED_ERR), "%Y-%m-%d"
-            ).expect("Cannot parse date").and_hms(0,0,0);
+                &s.start.expect(MALFORMED_ERR).date.expect(MALFORMED_ERR),
+                "%Y-%m-%d",
+            ).expect("Cannot parse date")
+                .and_hms(0, 0, 0);
             let end_date = chrono::NaiveDate::parse_from_str(
-                &s.end.expect(MALFORMED_ERR).date.expect(MALFORMED_ERR), "%Y-%m-%d"
-            ).expect("Cannot parse date").and_hms(0,0,0);
+                &s.end.expect(MALFORMED_ERR).date.expect(MALFORMED_ERR),
+                "%Y-%m-%d",
+            ).expect("Cannot parse date")
+                .and_hms(0, 0, 0);
             Meeting {
                 id: s.id.expect(MALFORMED_ERR),
-                start: tz.from_local_datetime(&start_date).unwrap().with_timezone(&chrono::Utc),
-                end: tz.from_local_datetime(&end_date).unwrap().with_timezone(&chrono::Utc),
+                start: tz.from_local_datetime(&start_date)
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                end: tz.from_local_datetime(&end_date)
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
             }
         } else {
             // Other event
             Meeting {
                 id: s.id.expect(MALFORMED_ERR),
-                start: chrono::DateTime::parse_from_rfc3339(&s.start.expect(MALFORMED_ERR).date_time.expect(MALFORMED_ERR))
+                start: chrono::DateTime::parse_from_rfc3339(&s.start
+                    .expect(MALFORMED_ERR)
+                    .date_time
+                    .expect(MALFORMED_ERR))
                     .expect(MALFORMED_ERR)
                     .with_timezone(&chrono::Utc),
-                end: chrono::DateTime::parse_from_rfc3339(&s.end.expect(MALFORMED_ERR).date_time.expect(MALFORMED_ERR))
+                end: chrono::DateTime::parse_from_rfc3339(&s.end
+                    .expect(MALFORMED_ERR)
+                    .date_time
+                    .expect(MALFORMED_ERR))
                     .expect(MALFORMED_ERR)
                     .with_timezone(&chrono::Utc),
             }
@@ -147,9 +161,10 @@ fn valid_api_meeting(
     ignore_all_day_events: bool,
     ignore_meetings_with_no_response: bool,
 ) -> bool {
-
-    let has_bound = (!l.start.clone().expect(MALFORMED_ERR).date_time.is_none() && !l.end.clone().expect(MALFORMED_ERR).date_time.is_none()) ||
-                     (!ignore_all_day_events && !l.start.expect(MALFORMED_ERR).date.is_none() && !l.end.expect(MALFORMED_ERR).date.is_none());
+    let has_bound = (!l.start.clone().expect(MALFORMED_ERR).date_time.is_none()
+        && !l.end.clone().expect(MALFORMED_ERR).date_time.is_none())
+        || (!ignore_all_day_events && !l.start.expect(MALFORMED_ERR).date.is_none()
+            && !l.end.expect(MALFORMED_ERR).date.is_none());
 
     if l.attendees.is_none() {
         return has_bound;
@@ -212,7 +227,11 @@ fn fetch_one_availability_with_api(
         .time_min(&chrono::Utc::now().to_rfc3339())
         .doit();
     let (_, events) = result.expect("Cannot reach google API");
-    let timezone:Tz = events.time_zone.expect(MALFORMED_ERR).parse().expect("Cannot decode timezone");
+    let timezone: Tz = events
+        .time_zone
+        .expect(MALFORMED_ERR)
+        .parse()
+        .expect("Cannot decode timezone");
     let events: Vec<calendar3::Event> = events.items.expect(MALFORMED_ERR);
 
     meetings_to_tree(&events
@@ -261,5 +280,6 @@ const CLIENT_SECRET_FILE: &str = "client_secret.json";
 
 // reads the JSON secret file
 fn read_client_secret(file: &str) -> ApplicationSecret {
-    read_application_secret(Path::new(file)).expect("Cannot find credential, did you create client_secret.json?")
+    read_application_secret(Path::new(file))
+        .expect("Cannot find credential, did you create client_secret.json?")
 }

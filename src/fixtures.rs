@@ -70,6 +70,20 @@ small_rooms:
   - joe@baz.com
 large_rooms:
   - bozorg@jam.com
+reject_iso_weekday:
+  - 1 # Monday
+  - 2 # Tuesday
+  - 3 # Wednesday
+reject_hour_range:
+  - from:
+      hours: 12
+      minutes: 0
+      seconds: 0
+    to:
+      hours: 13
+      minutes: 0
+      seconds: 0
+ignore_all_day_events: false
 "
         .to_string()
 }
