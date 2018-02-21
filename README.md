@@ -15,6 +15,14 @@ curl https://raw.githubusercontent.com/charignon/optirust/master/installer.sh | 
 - Clone this repo.
 - Generate credential for the google calendar api, put them in `client_secret.json` (https://docs.google.com/presentation/d/16VBTYIqoqWAeS0PW6rmPSHqyaZk5cPCo1ABByqvClSg/edit?usp=sharing)
 
+## Using with Docker
+
+See https://hub.docker.com/r/lcharignon/optirust
+
+## Building as a docker image and running as a container
+
+See https://hub.docker.com/r/lcharignon/optirust
+
 ## Usage
 - Write a config file containing email addresses for the rooms you are allowed to book (small is 1-2 people, large is 3+):
 ```yaml
